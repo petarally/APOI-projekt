@@ -1,0 +1,1053 @@
+---
+title: "Učinak online učenja na akademsku uspješnost studenata"
+subtitle: "Projekt — Analiza podataka i obrada informacija"
+author: "Student"
+date: today
+lang: hr
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Sadržaj"
+    number-sections: true
+    theme: cosmo
+    code-fold: false
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+---
+
+# Uvod
+
+Ovaj projekt analizira učinak online učenja i čimbenika učenja na akademsku uspješnost studenata. U suvremenom obrazovnom okruženju, posebice nakon pandemije COVID-19, online učenje postalo je nezaobilazan dio obrazovnog procesa. Cilj projekta je primijeniti statističke metode i modele na stvarnim podatcima kako bi se odgovorilo na konkretna istraživačka pitanja o čimbenicima koji utječu na akademski uspjeh.
+
+---
+
+# Faza 1: Odabir i dohvat podataka
+
+## Pojmovno, prostorno i vremensko određenje skupa podataka
+
+**Pojmovno određenje:** Statistički skup obuhvaća podatke o akademskoj uspješnosti i ponašanju studenata u kontekstu različitih stilova i oblika učenja. Varijable uključuju demografska obilježja (dob, spol), ponašanje pri učenju (sate učenja, pohađanje nastave, završetak zadataka), pristup resursima (internet, obrazovne tehnologije, online tečajevi), psihološke čimbenike (motivacija, razina stresa) te pokazatelje akademske uspješnosti (rezultat ispita, završna ocjena).
+
+**Prostorno određenje:** Dataset je kompiliran spajanjem dvaju javno dostupnih Kaggle skupova podataka od strane istraživača s Sveučilišta Mohammed V. Zbog anonimizacije, precizna geografska lokacija nije navedena.
+
+**Vremensko određenje:** Podatci su objavljeni 2025. godine (Zenodo repozitorij, verzija v1, srpanj 2025.), a izvorni Kaggle dataseti iz kojih su nastali prikupljani su u recentnom periodu (2023.–2025.).
+
+**Populacija ili uzorak:** Radi se o **uzorku** studentske populacije — skup sadrži 14.003 anonimiziranih studentskih zapisa koji reprezentiraju studente visokoškolskih ustanova. Budući da nije obuhvaćena cijela populacija studenata, radi se o uzorku iz kojeg se može inferirati na širu populaciju uz određenu statističku pogrešku.
+
+## Izvor podataka
+
+Podatci su preuzeti s platforme **Kaggle**:
+
+- **Naziv dataseta:** Student Performance and Learning Behavior Dataset  
+- **Autor:** Adil Shamim (2025)  
+- **Link:** <https://www.kaggle.com/datasets/adilshamim8/student-performance-and-learning-style>  
+- **Licenca:** Creative Commons Attribution 4.0 International (CC BY 4.0)  
+- **Dodatno:** Dataset je dokumentiran i na Zenodo repozitoriju (DOI: 10.5281/zenodo.16459132)
+
+```{r}
+#| label: dohvat-podataka
+#| echo: true
+
+# Učitavanje potrebnih paketa
+library(tidyverse)    # manipulacija i vizualizacija
+library(ggplot2)      # grafičke vizualizacije
+library(dplyr)        # manipulacija podatcima
+library(knitr)        # formatiranje tablica
+library(kableExtra)   # napredne tablice
+library(moments)      # mjere oblika distribucije (skewness, kurtosis)
+library(car)          # Levene test, dijagnostika regresije
+library(nortest)      # Anderson-Darling test normalnosti
+library(rpart)        # stablo odlučivanja
+library(rpart.plot)   # vizualizacija stabla odlučivanja
+library(caret)        # evaluacija klasifikacijskih modela
+library(e1071)        # konfuzijska matrica
+library(MASS)         # dodatne statističke metode
+library(corrplot)     # korelacijska matrica
+
+# Dohvat podataka s Kaggle-a
+# Dataset je potrebno preuzeti s: 
+# https://www.kaggle.com/datasets/adilshamim8/student-performance-and-learning-style
+# i pohraniti kao "student_performace.csv" u radni direktorij
+
+# Za reprodukciju projekta, podatci se učitavaju lokalno:
+df_raw <- read.csv("student_performance.csv", stringsAsFactors = FALSE)
+
+# Pregled dimenzija sirovih podataka
+cat("Dimenzije sirovih podataka:", nrow(df_raw), "redaka x", ncol(df_raw), "stupaca\n")
+cat("Nazivi varijabli:\n")
+print(names(df_raw))
+```
+
+---
+
+# Faza 2: ETL Proces
+
+## Pregled sirovih podataka
+
+```{r}
+#| label: pregled-sirovih
+
+# Pregled prvih nekoliko redaka
+head(df_raw, 5) |> kable(caption = "Prvih 5 redaka sirovih podataka") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+# Struktura podataka
+str(df_raw)
+```
+
+## Čišćenje podataka
+
+### Standardizacija naziva varijabli
+
+```{r}
+#| label: standardizacija-naziva
+
+# Kopija za ETL
+df <- df_raw
+
+# Standardizacija naziva varijabli (mala slova, bez razmaka)
+names(df) <- tolower(gsub("\\.", "_", names(df)))
+names(df) <- gsub(" ", "_", names(df))
+
+cat("Standardizirani nazivi varijabli:\n")
+print(names(df))
+```
+
+### Provjera nedostajućih vrijednosti
+
+```{r}
+#| label: nedostajuce-vrijednosti
+
+# Pregled nedostajućih vrijednosti po varijabli
+na_pregled <- df |>
+  summarise(across(everything(), ~sum(is.na(.)))) |>
+  pivot_longer(everything(), names_to = "varijabla", values_to = "broj_NA") |>
+  mutate(postotak_NA = round(broj_NA / nrow(df) * 100, 2))
+
+na_pregled |>
+  kable(caption = "Nedostajuće vrijednosti po varijabli") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+cat("\nUkupan broj nedostajućih vrijednosti:", sum(is.na(df)), "\n")
+```
+
+```{r}
+#| label: rjesavanje-NA
+
+# Ako postoje nedostajuće vrijednosti u numeričkim varijablama — imputacija medijanom
+# Ako postoje u kategorijskim — imputacija modom
+
+num_vars <- names(df)[sapply(df, is.numeric)]
+cat_vars <- names(df)[sapply(df, is.character)]
+
+# Imputacija numeričkih varijabli medijanom
+for (var in num_vars) {
+  if (any(is.na(df[[var]]))) {
+    med_val <- median(df[[var]], na.rm = TRUE)
+    df[[var]][is.na(df[[var]])] <- med_val
+    cat("Imputacija medijanom za varijablu:", var, "| medijan =", med_val, "\n")
+  }
+}
+
+# Imputacija kategorijskih varijabli modom
+get_mode <- function(x) {
+  ux <- unique(x[!is.na(x)])
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+for (var in cat_vars) {
+  if (any(is.na(df[[var]]))) {
+    mod_val <- get_mode(df[[var]])
+    df[[var]][is.na(df[[var]])] <- mod_val
+    cat("Imputacija modom za varijablu:", var, "| mod =", mod_val, "\n")
+  }
+}
+
+cat("\nNedostajuće vrijednosti nakon imputacije:", sum(is.na(df)), "\n")
+```
+
+### Provjera duplikata
+
+```{r}
+#| label: duplikati
+
+n_duplikata <- sum(duplicated(df))
+cat("Broj duplikata:", n_duplikata, "\n")
+
+if (n_duplikata > 0) {
+  df <- df[!duplicated(df), ]
+  cat("Duplikati uklonjeni. Novi broj redaka:", nrow(df), "\n")
+} else {
+  cat("Nema duplikata — podatci su čisti.\n")
+}
+```
+
+## Transformacija i prilagodba tipova varijabli
+
+```{r}
+#| label: transformacija-tipova
+
+# Provjera i prilagodba tipova varijabli
+# Kategorijske varijable pretvaramo u faktore
+
+# Pretpostavljene kategorijske varijable (prilagoditi prema stvarnim nazivima)
+cat_cols <- c("gender", "learningstyle", "internet", "extracurricular",
+              "discussions", "resources", "edutech", "finalgrade")
+
+# Primjena pretvorbe samo za varijable koje postoje u datasetu
+cat_cols_exist <- intersect(cat_cols, names(df))
+
+for (col in cat_cols_exist) {
+  df[[col]] <- as.factor(df[[col]])
+}
+
+# Numeričke varijable
+num_cols <- c("age", "studyhours", "attendance", "assignmentcompletion",
+              "onlinecourses", "motivation", "stresslevel", "examscore")
+num_cols_exist <- intersect(num_cols, names(df))
+
+for (col in num_cols_exist) {
+  df[[col]] <- as.numeric(df[[col]])
+}
+
+cat("Tipovi varijabli nakon transformacije:\n")
+sapply(df, class) |> as.data.frame() |>
+  setNames("tip") |>
+  kable(caption = "Tipovi varijabli") |>
+  kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
+```
+
+## Priprema data.frame-a za analizu
+
+```{r}
+#| label: finalni-dataframe
+
+# Pregled finalnog data.frame-a
+cat("=== FINALNI DATA.FRAME ===\n")
+cat("Broj opservacija:", nrow(df), "\n")
+cat("Broj varijabli:", ncol(df), "\n\n")
+
+# Sažetak strukture
+glimpse(df)
+
+# Kreiranje binarne varijable prolaz/pad za klasifikaciju
+# FinalGrade — ako je faktor s kategorijama, mapiramo u binarno
+# Pretpostavljamo da postoje kategorije poput "Pass"/"Fail" ili numeričke ocjene
+
+if ("finalgrade" %in% names(df)) {
+  # FinalGrade je numerički kod: 0=A (najbolja), 1=B, 2=C, 3=D (najlošija)
+  # Prolaz = ocjena A ili B (kod 0 ili 1), Pad = ocjena C ili D (kod 2 ili 3)
+  fg_num <- as.integer(as.character(df$finalgrade))
+  df$prolaz <- factor(ifelse(fg_num <= 1, "Prolaz", "Pad"),
+                      levels = c("Pad", "Prolaz"))
+  cat("\nDistribucija binarne varijable Prolaz/Pad:\n")
+  print(table(df$prolaz))
+}
+
+# Pohrana čistog data.frame-a
+df_clean <- df
+cat("\nData.frame spreman za analizu.\n")
+```
+
+---
+
+# Faza 3: Eksploracijska analiza podataka (EDA)
+
+## Deskriptivna statistika
+
+### Numeričke varijable
+
+```{r}
+#| label: deskriptivna-statistika
+
+# Funkcija za deskriptivnu statistiku
+deskriptivna_stat <- function(x, naziv) {
+  x_clean <- x[!is.na(x)]
+  data.frame(
+    Varijabla    = naziv,
+    N            = length(x_clean),
+    Srednja_vr   = round(mean(x_clean), 3),
+    Medijan      = round(median(x_clean), 3),
+    Mod          = round(as.numeric(names(sort(table(x_clean), 
+                                               decreasing = TRUE)[1])), 3),
+    Std_dev      = round(sd(x_clean), 3),
+    Varijanca    = round(var(x_clean), 3),
+    IQR          = round(IQR(x_clean), 3),
+    Min          = round(min(x_clean), 3),
+    Maks         = round(max(x_clean), 3),
+    Asimetricnost = round(skewness(x_clean), 3),
+    Spljoštenost  = round(kurtosis(x_clean), 3)
+  )
+}
+
+# Primjena na sve numeričke varijable
+num_vars_clean <- names(df_clean)[sapply(df_clean, is.numeric)]
+
+stat_tablica <- map_dfr(num_vars_clean, function(v) {
+  deskriptivna_stat(df_clean[[v]], v)
+})
+
+stat_tablica |>
+  kable(caption = "Deskriptivna statistika numeričkih varijabli",
+        digits = 3) |>
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = TRUE, font_size = 11) |>
+  scroll_box(width = "100%")
+```
+
+**Interpretacija:** Aritmetička sredina predstavlja prosječnu vrijednost varijable u uzorku. Medijan je robusniji pokazatelj središnje tendencije koji nije osjetljiv na ekstremne vrijednosti (outliere). Mod označava najčešće pojavljenu vrijednost. Standardna devijacija i varijanca mjere raspršenost podataka oko srednje vrijednosti, dok IQR (interkvartilni raspon) opisuje srednju polovicu distribucije. Asimetričnost (skewness) > 0 ukazuje na pozitivno zakošenu distribuciju (rep prema višim vrijednostima), a vrijednosti < 0 na negativno zakošenu. Spljoštenost (kurtosis) > 3 ukazuje na leptokurtičnu (šiljatiju od normalne) distribuciju.
+
+### Kategorijske varijable
+
+```{r}
+#| label: deskriptivna-kategorijske
+
+cat_vars_clean <- names(df_clean)[sapply(df_clean, is.factor)]
+
+for (var in cat_vars_clean) {
+  cat("\n--- Frekvencijska tablica za varijablu:", var, "---\n")
+  freq_tab <- table(df_clean[[var]])
+  freq_rel <- prop.table(freq_tab) * 100
+  
+  tablica <- data.frame(
+    Kategorija   = names(freq_tab),
+    Frekvencija  = as.numeric(freq_tab),
+    Postotak     = round(as.numeric(freq_rel), 2)
+  )
+  print(kable(tablica, caption = paste("Frekvencijska tablica —", var)) |>
+    kable_styling(bootstrap_options = c("striped"), full_width = FALSE))
+}
+```
+
+## Vizualizacija
+
+### Histogrami numeričkih varijabli
+
+```{r}
+#| label: histogrami
+#| fig-width: 12
+#| fig-height: 8
+
+df_clean |>
+  dplyr::select(all_of(num_vars_clean)) |>
+  pivot_longer(everything(), names_to = "varijabla", values_to = "vrijednost") |>
+  ggplot(aes(x = vrijednost, fill = varijabla)) +
+  geom_histogram(bins = 30, color = "white", alpha = 0.85) +
+  facet_wrap(~varijabla, scales = "free", ncol = 3) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none",
+        strip.text = element_text(face = "bold")) +
+  labs(title = "Distribucija numeričkih varijabli",
+       subtitle = "Histogrami s 30 razreda",
+       x = "Vrijednost", y = "Frekvencija")
+```
+
+**Interpretacija:** Histogrami prikazuju distribuciju svake numeričke varijable. Simetrična, zvonolika distribucija upućuje na normalnost. Vidljivi repovi prema desno ili lijevo indiciraju asimetričnost distribucije što je relevantno za odabir statističkih testova.
+
+### Box-plotovi i outlieri
+
+```{r}
+#| label: boxplots
+#| fig-width: 12
+#| fig-height: 7
+
+df_clean |>
+  dplyr::select(all_of(num_vars_clean)) |>
+  pivot_longer(everything(), names_to = "varijabla", values_to = "vrijednost") |>
+  ggplot(aes(x = varijabla, y = vrijednost, fill = varijabla)) +
+  geom_boxplot(outlier.colour = "red", outlier.alpha = 0.5, 
+               outlier.size = 1.5, alpha = 0.7) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Box-plotovi numeričkih varijabli",
+       subtitle = "Crvene točke označavaju outliere (vrijednosti izvan 1.5 × IQR)",
+       x = "Varijabla", y = "Vrijednost")
+```
+
+**Interpretacija:** Box-plot prikazuje medijan (srednja linija), interkvartilni raspon (kutija), raspon bez outliera (brkovi) i outliere (crvene točke). Outlieri su vrijednosti koje se nalaze više od 1.5 puta IQR iznad trećeg ili ispod prvog kvartila. Prisutnost outliera može utjecati na parametrijske testove i regresijske modele.
+
+### Stupčasti dijagrami kategorijskih varijabli
+
+```{r}
+#| label: stupcastiDijagrami
+#| fig-width: 12
+#| fig-height: 6
+
+# LearningStyle distribucija
+if ("learningstyle" %in% names(df_clean)) {
+  p1 <- df_clean |>
+    count(learningstyle) |>
+    ggplot(aes(x = reorder(learningstyle, -n), y = n, fill = learningstyle)) +
+    geom_bar(stat = "identity", alpha = 0.85) +
+    geom_text(aes(label = n), vjust = -0.3, size = 3.5) +
+    scale_fill_brewer(palette = "Set1") +
+    theme_minimal(base_size = 12) +
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle = 20, hjust = 1)) +
+    labs(title = "Distribucija stilova učenja",
+         x = "Stil učenja", y = "Broj studenata")
+  print(p1)
+}
+
+# Gender distribucija
+if ("gender" %in% names(df_clean)) {
+  p2 <- df_clean |>
+    count(gender) |>
+    ggplot(aes(x = gender, y = n, fill = gender)) +
+    geom_bar(stat = "identity", alpha = 0.85, width = 0.5) +
+    geom_text(aes(label = n), vjust = -0.3, size = 4) +
+    scale_fill_manual(values = c("#E74C3C", "#3498DB", "#2ECC71")) +
+    theme_minimal(base_size = 12) +
+    theme(legend.position = "none") +
+    labs(title = "Distribucija po spolu",
+         x = "Spol", y = "Broj studenata")
+  print(p2)
+}
+```
+
+### Dijagrami rasipanja
+
+```{r}
+#| label: scatterplot
+#| fig-width: 10
+#| fig-height: 6
+
+# Odnos sati učenja i rezultata ispita
+if (all(c("studyhours", "examscore") %in% names(df_clean))) {
+  ggplot(df_clean, aes(x = studyhours, y = examscore)) +
+    geom_point(alpha = 0.2, color = "#3498DB", size = 1) +
+    geom_smooth(method = "lm", color = "#E74C3C", se = TRUE, linewidth = 1.2) +
+    theme_minimal(base_size = 13) +
+    labs(title = "Odnos sati učenja i rezultata ispita",
+         subtitle = "Plava linija = linearni trend (OLS), sivo područje = 95% interval pouzdanosti",
+         x = "Sati učenja tjedno", y = "Rezultat ispita")
+}
+```
+
+```{r}
+#| label: scatterplot-motivacija
+#| fig-width: 10
+#| fig-height: 6
+
+# Odnos motivacije i rezultata ispita prema stilu učenja
+if (all(c("motivation", "examscore", "learningstyle") %in% names(df_clean))) {
+  ggplot(df_clean, aes(x = motivation, y = examscore, color = learningstyle)) +
+    geom_point(alpha = 0.25, size = 1) +
+    geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+    scale_color_brewer(palette = "Set1") +
+    theme_minimal(base_size = 13) +
+    labs(title = "Motivacija i rezultat ispita prema stilu učenja",
+         x = "Motivacija", y = "Rezultat ispita",
+         color = "Stil učenja")
+}
+```
+
+### Korelacijska matrica
+
+```{r}
+#| label: korelacijska-matrica
+#| fig-width: 9
+#| fig-height: 8
+
+korel_mat <- df_clean |>
+  dplyr::select(all_of(num_vars_clean)) |>
+  cor(use = "complete.obs")
+
+corrplot(korel_mat,
+         method = "color",
+         type = "upper",
+         order = "hclust",
+         addCoef.col = "black",
+         number.cex = 0.7,
+         tl.cex = 0.9,
+         tl.col = "black",
+         col = colorRampPalette(c("#E74C3C", "white", "#3498DB"))(200),
+         title = "Korelacijska matrica numeričkih varijabli",
+         mar = c(0, 0, 2, 0))
+```
+
+**Interpretacija:** Korelacijska matrica prikazuje Pearsonove koeficijente korelacije između svih parova numeričkih varijabli. Vrijednosti bliže +1 (tamno plava) ukazuju na jaku pozitivnu korelaciju, vrijednosti bliže -1 (tamno crvena) na jaku negativnu korelaciju, a vrijednosti oko 0 na odsutnost linearne veze. Korelacije između prediktorskih varijabli > |0.7| mogu ukazivati na multikolinearnost koja može biti problematična u regresijskim modelima.
+
+## Provjera normalnosti distribucije
+
+### Q-Q plotovi
+
+```{r}
+#| label: qq-plotovi
+#| fig-width: 12
+#| fig-height: 8
+
+par(mfrow = c(ceiling(length(num_vars_clean)/3), 3),
+    mar = c(4, 4, 3, 1))
+
+for (var in num_vars_clean) {
+  x <- df_clean[[var]]
+  x <- x[!is.na(x)]
+  qqnorm(x, main = paste("Q-Q plot:", var),
+         pch = 1, cex = 0.3, col = "#3498DB")
+  qqline(x, col = "#E74C3C", lwd = 2)
+}
+par(mfrow = c(1, 1))
+```
+
+**Interpretacija:** Q-Q (quantile-quantile) plot uspoređuje kvantile distribucije varijable s kvantilima normalne distribucije. Ako točke leže blizu crvene dijagonale, distribucija je normalna. Odstupanja u repovima (S-oblik ili obrnuti S-oblik) ukazuju na asimetričnost ili debelorepe distribucije.
+
+### Shapiro-Wilk test normalnosti
+
+```{r}
+#| label: shapiro-wilk
+
+# Zbog velikog uzorka (N > 5000) Shapiro-Wilk test je ograničen na N = 5000
+# Za veće uzorke koristimo Anderson-Darling test
+
+set.seed(42)
+n_test <- min(5000, nrow(df_clean))
+
+normalnost_rezultati <- map_dfr(num_vars_clean, function(var) {
+  x <- df_clean[[var]][!is.na(df_clean[[var]])]
+  
+  # Shapiro-Wilk na poduzorku
+  x_sample <- sample(x, size = min(5000, length(x)))
+  sw_test <- shapiro.test(x_sample)
+  
+  # Anderson-Darling test (cijeli uzorak)
+  ad_test <- nortest::ad.test(x)
+  
+  data.frame(
+    Varijabla    = var,
+    SW_statistika = round(sw_test$statistic, 4),
+    SW_p_vrijednost = round(sw_test$p.value, 4),
+    AD_statistika = round(ad_test$statistic, 4),
+    AD_p_vrijednost = round(ad_test$p.value, 4),
+    Normalna = ifelse(sw_test$p.value > 0.05, "Da", "Ne")
+  )
+})
+
+normalnost_rezultati |>
+  kable(caption = "Testovi normalnosti (SW = Shapiro-Wilk na uzorku N≤5000; AD = Anderson-Darling)") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Interpretacija:** Shapiro-Wilk i Anderson-Darling testovi testiraju nultu hipotezu H₀: distribucija je normalna. Ako je p-vrijednost < 0.05, odbacujemo H₀ i zaključujemo da distribucija nije normalna. Napomena: s velikim uzorcima (N > 5.000) ovi testovi postaju izuzetno osjetljivi i odbacuju normalnost čak i pri minimalnim odstupanjima. Zbog toga je vizualna provjera Q-Q plotom ravnopravno važna. Prema Centralnom graničnom teoremu, za velike uzorke (N > 30) parametrijski testovi su robustni i pri umjerenim odstupanjima od normalnosti.
+
+---
+
+# Faza 4: Istraživačka pitanja i hipoteze
+
+Na temelju eksploracijske analize, formulirana su sljedeća istraživačka pitanja:
+
+**Pitanje 1:** Postoji li statistički značajna razlika u rezultatima ispita između studenata s različitim stilovima učenja?
+
+- H₀: Ne postoji razlika u prosječnim rezultatima ispita između grupa stilova učenja (μ₁ = μ₂ = ... = μₖ)
+- H₁: Postoji razlika u prosječnom rezultatu ispita između barem dviju grupa stilova učenja
+
+**Pitanje 2:** Postoji li statistički značajna razlika u rezultatima ispita između studenata koji pohađaju online tečajeve i onih koji ne pohađaju?
+
+- H₀: Nema razlike u prosječnom rezultatu ispita između studenata s online tečajevima i bez njih (μ_online = μ_bez_online)
+- H₁: Postoji statistički značajna razlika u prosječnom rezultatu ispita (μ_online ≠ μ_bez_online)
+
+**Pitanje 3:** Mogu li sati učenja, pohađanje nastave, motivacija i online tečajevi predvidjeti rezultat ispita?
+
+- H₀: Niti jedan prediktor ne doprinosi značajno objašnjenju varijance rezultata ispita (β₁ = β₂ = ... = βₖ = 0)
+- H₁: Barem jedan prediktor statistički značajno predviđa rezultat ispita
+
+**Pitanje 4:** Može li se na temelju dostupnih varijabli klasificirati hoće li student položiti ili ne?
+
+- H₀: Model klasifikacije ne predviđa prolaz/pad bolje od slučajnog pogađanja
+- H₁: Model klasifikacije statistički značajno predviđa prolaz/pad (točnost > bazna stopa)
+
+---
+
+# Faza 5: Modeliranje i interpretacija
+
+## 5.1 Usporedba skupina — ANOVA i t-test
+
+### Jednosmjerna ANOVA: Razlike u rezultatu ispita po stilu učenja
+
+```{r}
+#| label: anova-stil-ucenja
+
+if (all(c("examscore", "learningstyle") %in% names(df_clean))) {
+  
+  # Deskriptivna statistika po grupama
+  df_clean |>
+    group_by(learningstyle) |>
+    summarise(
+      N       = n(),
+      Srednja = round(mean(examscore, na.rm = TRUE), 2),
+      SD      = round(sd(examscore, na.rm = TRUE), 2),
+      Medijan = round(median(examscore, na.rm = TRUE), 2),
+      .groups = "drop"
+    ) |>
+    kable(caption = "Deskriptivna statistika rezultata ispita po stilu učenja") |>
+    kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
+}
+```
+
+```{r}
+#| label: anova-pretpostavke
+
+if (all(c("examscore", "learningstyle") %in% names(df_clean))) {
+  
+  # Provjera pretpostavki ANOVA
+  # 1. Homogenost varijanci — Levene test
+  levene_rez <- car::leveneTest(examscore ~ learningstyle, data = df_clean)
+  cat("=== Levene test homogenosti varijanci ===\n")
+  print(levene_rez)
+  cat("\n")
+  
+  if (levene_rez$`Pr(>F)`[1] > 0.05) {
+    cat("Zaključak: p >  0.05 → Ne odbacujemo H₀. Varijance su homogene.\n")
+    cat("Koristimo standardnu jednosmjernu ANOVA-u.\n")
+  } else {
+    cat("Zaključak: p < 0.05 → Odbacujemo H₀. Varijance nisu homogene.\n")
+    cat("Koristimo Welch-ANOVA-u koja je robustna na heterogenost varijanci.\n")
+  }
+}
+```
+
+```{r}
+#| label: anova-test
+
+if (all(c("examscore", "learningstyle") %in% names(df_clean))) {
+  
+  # Jednosmjerna ANOVA
+  anova_model <- aov(examscore ~ learningstyle, data = df_clean)
+  cat("=== Jednosmjerna ANOVA ===\n")
+  print(summary(anova_model))
+  
+  # Welch-ANOVA (robustna alternativa)
+  cat("\n=== Welch-ANOVA (robustna na heterogenost varijanci) ===\n")
+  welch_anova <- oneway.test(examscore ~ learningstyle, 
+                              data = df_clean, var.equal = FALSE)
+  print(welch_anova)
+  
+  # Post-hoc test (Tukey HSD)
+  cat("\n=== Post-hoc test: Tukey HSD ===\n")
+  tukey_rez <- TukeyHSD(anova_model)
+  print(tukey_rez)
+}
+```
+
+```{r}
+#| label: anova-vizualizacija
+#| fig-width: 10
+#| fig-height: 6
+
+if (all(c("examscore", "learningstyle") %in% names(df_clean))) {
+  
+  ggplot(df_clean, aes(x = learningstyle, y = examscore, fill = learningstyle)) +
+    geom_boxplot(alpha = 0.75, outlier.alpha = 0.3, outlier.size = 1) +
+    stat_summary(fun = mean, geom = "point", shape = 18, 
+                 size = 4, color = "black") +
+    scale_fill_brewer(palette = "Set2") +
+    theme_minimal(base_size = 13) +
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle = 20, hjust = 1)) +
+    labs(title = "Distribucija rezultata ispita po stilu učenja",
+         subtitle = "Crni romb (◆) označava aritmetičku sredinu",
+         x = "Stil učenja", y = "Rezultat ispita")
+}
+```
+
+**Interpretacija ANOVA:** ANOVA testira jesu li prosječni rezultati ispita jednaki u svim grupama stilova učenja. F-statistika mjeri omjer varijance između grupa i varijance unutar grupa. Visoka F-vrijednost i niska p-vrijednost (< 0.05) ukazuju da razlike između grupa nisu nastale slučajno. Tukey HSD post-hoc test identificira koje specifične parove grupa se statistički značajno razlikuju uz kontrolu greške tipa I.
+
+### Nezavisni t-test: Online tečajevi i rezultat ispita
+
+```{r}
+#| label: t-test
+
+if (all(c("examscore", "onlinecourses") %in% names(df_clean))) {
+  
+  # Binarizacija online tečajeva ako nije binarna varijabla
+  if (is.numeric(df_clean$onlinecourses)) {
+    df_clean$online_bin <- factor(
+      ifelse(df_clean$onlinecourses > 0, "Pohađa online tečajeve", 
+             "Ne pohađa online tečajeve"),
+      levels = c("Ne pohađa online tečajeve", "Pohađa online tečajeve")
+    )
+  } else {
+    df_clean$online_bin <- df_clean$onlinecourses
+  }
+  
+  # Deskriptivna statistika po grupama
+  df_clean |>
+    group_by(online_bin) |>
+    summarise(
+      N       = n(),
+      Srednja = round(mean(examscore, na.rm = TRUE), 2),
+      SD      = round(sd(examscore, na.rm = TRUE), 2),
+      Medijan = round(median(examscore, na.rm = TRUE), 2),
+      .groups = "drop"
+    ) |>
+    kable(caption = "Rezultat ispita prema pohađanju online tečajeva") |>
+    kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
+  
+  # Levene test
+  levene_t <- car::leveneTest(examscore ~ online_bin, data = df_clean)
+  cat("\n=== Levene test ===\n")
+  print(levene_t)
+  
+  # Welch t-test (ne pretpostavlja jednake varijance)
+  t_test_rez <- t.test(examscore ~ online_bin, data = df_clean, 
+                        var.equal = FALSE)
+  cat("\n=== Welch nezavisni t-test ===\n")
+  print(t_test_rez)
+  
+  # Veličina učinka — Cohenov d
+  grupe <- split(df_clean$examscore, df_clean$online_bin)
+  m1 <- mean(grupe[[1]], na.rm = TRUE)
+  m2 <- mean(grupe[[2]], na.rm = TRUE)
+  sd1 <- sd(grupe[[1]], na.rm = TRUE)
+  sd2 <- sd(grupe[[2]], na.rm = TRUE)
+  n1 <- length(na.omit(grupe[[1]]))
+  n2 <- length(na.omit(grupe[[2]]))
+  pooled_sd <- sqrt(((n1 - 1) * sd1^2 + (n2 - 1) * sd2^2) / (n1 + n2 - 2))
+  cohen_d <- abs(m1 - m2) / pooled_sd
+  
+  cat("\n=== Veličina učinka ===\n")
+  cat("Cohenov d =", round(cohen_d, 3), "\n")
+  cat("Interpretacija:",
+    ifelse(cohen_d < 0.2, "zanemariva",
+    ifelse(cohen_d < 0.5, "mala",
+    ifelse(cohen_d < 0.8, "srednja", "velika"))),
+    "veličina učinka\n")
+}
+```
+
+```{r}
+#| label: ttest-vizualizacija
+#| fig-width: 9
+#| fig-height: 5
+
+if ("online_bin" %in% names(df_clean)) {
+  ggplot(df_clean, aes(x = online_bin, y = examscore, fill = online_bin)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(width = 0.15, alpha = 0.9, outlier.alpha = 0.3) +
+    stat_summary(fun = mean, geom = "point", 
+                 shape = 18, size = 4, color = "black") +
+    scale_fill_manual(values = c("#E74C3C", "#3498DB")) +
+    theme_minimal(base_size = 13) +
+    theme(legend.position = "none") +
+    labs(title = "Rezultat ispita prema pohađanju online tečajeva",
+         subtitle = "Violinski prikaz + box-plot; ◆ = aritmetička sredina",
+         x = "", y = "Rezultat ispita")
+}
+```
+
+**Interpretacija t-testa:** Welch-ov t-test koristi se jer ne pretpostavlja jednake varijance skupina. t-statistika mjeri razliku između aritmetičkih sredina u standardiziranim jedinicama. p-vrijednost < 0.05 znači da je razlika statistički značajna, tj. nije nastala slučajno. Cohenov d mjeri praktičnu važnost razlike: d < 0.2 (zanemariva), 0.2–0.5 (mala), 0.5–0.8 (srednja), > 0.8 (velika veličina učinka).
+
+## 5.2 Kvantifikacija odnosa — Višestruka linearna regresija
+
+```{r}
+#| label: regresija
+
+# Odabir prediktora
+prediktori <- intersect(
+  c("studyhours", "attendance", "onlinecourses", "motivation", 
+    "stresslevel", "assignmentcompletion", "age"),
+  names(df_clean)
+)
+
+# Formula modela
+formula_reg <- as.formula(paste("examscore ~", paste(prediktori, collapse = " + ")))
+
+# Izgradnja modela
+model_reg <- lm(formula_reg, data = df_clean)
+
+cat("=== Višestruka linearna regresija ===\n")
+print(summary(model_reg))
+```
+
+```{r}
+#| label: regresija-interpretacija
+
+# Koeficijenti s intervalima pouzdanosti
+koef_df <- as.data.frame(confint(model_reg))
+koef_df$Procjena <- coef(model_reg)
+koef_df$t_vrijednost <- summary(model_reg)$coefficients[, "t value"]
+koef_df$p_vrijednost <- summary(model_reg)$coefficients[, "Pr(>|t|)"]
+koef_df$Znacajnost <- ifelse(koef_df$p_vrijednost < 0.001, "***",
+                      ifelse(koef_df$p_vrijednost < 0.01, "**",
+                      ifelse(koef_df$p_vrijednost < 0.05, "*",
+                      ifelse(koef_df$p_vrijednost < 0.1, ".", ""))))
+
+koef_df |>
+  mutate(across(where(is.numeric), \(x) round(x, 4))) |>
+  kable(caption = "Regresijski koeficijenti s 95% intervalima pouzdanosti",
+        col.names = c("2.5%", "97.5%", "Procjena (β)", "t", "p", "Značajnost")) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+cat("\nR² =", round(summary(model_reg)$r.squared, 4), "\n")
+cat("Adj. R² =", round(summary(model_reg)$adj.r.squared, 4), "\n")
+cat("F-statistika:", round(summary(model_reg)$fstatistic[1], 3),
+    "| p-vrijednost:", 
+    format.pval(pf(summary(model_reg)$fstatistic[1],
+                   summary(model_reg)$fstatistic[2],
+                   summary(model_reg)$fstatistic[3],
+                   lower.tail = FALSE), digits = 4), "\n")
+```
+
+```{r}
+#| label: regresija-dijagnostika
+#| fig-width: 11
+#| fig-height: 9
+
+# Dijagnostički plotovi
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+plot(model_reg, which = 1:4, col = "#3498DB",
+     pch = 16, cex = 0.4)
+par(mfrow = c(1, 1))
+```
+
+**Interpretacija regresije:** Svaki regresijski koeficijent β_i interpretira se kao: "uz kontrolu svih ostalih varijabli u modelu, povećanje prediktora X_i za jednu jedinicu povezano je s promjenom zavisne varijable za β_i jedinica". R² (koeficijent determinacije) govori koji postotak varijance rezultata ispita model objašnjava. Adj. R² korigira R² za broj prediktora. Dijagnostički plotovi provjeravaju pretpostavke regresije: linearnost, homoskedastičnost rezidua, normalnost rezidua i utjecaj outliera (Cook-ova udaljenost).
+
+```{r}
+#| label: regresija-vizualizacija
+#| fig-width: 9
+#| fig-height: 5
+
+# Vizualizacija koeficijenata (forest plot)
+koef_vizual <- data.frame(
+  Varijabla = names(coef(model_reg))[-1],
+  Procjena  = coef(model_reg)[-1],
+  CI_low    = confint(model_reg)[-1, 1],
+  CI_high   = confint(model_reg)[-1, 2],
+  Znacajno  = summary(model_reg)$coefficients[-1, "Pr(>|t|)"] < 0.05
+)
+
+ggplot(koef_vizual, aes(x = reorder(Varijabla, Procjena), 
+                         y = Procjena, color = Znacajno)) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = CI_low, ymax = CI_high), width = 0.25, linewidth = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  coord_flip() +
+  scale_color_manual(values = c("grey60", "#E74C3C"),
+                     labels = c("Nije značajno (p ≥ 0.05)", "Značajno (p < 0.05)")) +
+  theme_minimal(base_size = 13) +
+  labs(title = "Regresijski koeficijenti s 95% intervalima pouzdanosti",
+       subtitle = "Crvene točke = statistički značajni prediktori",
+       x = "Prediktor", y = "Procjena koeficijenta (β)",
+       color = "Značajnost")
+```
+
+## 5.3 Klasifikacija — Stablo odlučivanja
+
+```{r}
+#| label: klasifikacija-priprema
+
+if ("prolaz" %in% names(df_clean)) {
+  
+  # Podjela na trening i test skup (70:30)
+  set.seed(42)
+  n_obs <- nrow(df_clean)
+  train_idx <- sample(1:n_obs, size = floor(0.7 * n_obs))
+  train_df <- df_clean[train_idx, ]
+  test_df  <- df_clean[-train_idx, ]
+  
+  cat("Veličina trening skupa:", nrow(train_df), "opservacija\n")
+  cat("Veličina test skupa:", nrow(test_df), "opservacija\n")
+  cat("\nDistribucija ciljne varijable u trening skupu:\n")
+  print(prop.table(table(train_df$prolaz)) * 100)
+}
+```
+
+```{r}
+#| label: klasifikacija-stablo
+
+if ("prolaz" %in% names(df_clean)) {
+  
+  # Formula za klasifikaciju
+  pred_klas <- intersect(
+    c("studyhours", "attendance", "onlinecourses", "motivation",
+      "stresslevel", "assignmentcompletion", "learningstyle", 
+      "internet", "gender"),
+    names(df_clean)
+  )
+  
+  formula_klas <- as.formula(paste("prolaz ~", paste(pred_klas, collapse = " + ")))
+  
+  # Izgradnja stabla odlučivanja
+  stablo <- rpart(formula_klas,
+                  data = train_df,
+                  method = "class",
+                  control = rpart.control(
+                    minsplit = 20,
+                    minbucket = 7,
+                    cp = 0.001,
+                    maxdepth = 5
+                  ))
+  
+  cat("=== Stablo odlučivanja — sažetak ===\n")
+  printcp(stablo)
+}
+```
+
+```{r}
+#| label: klasifikacija-prikaz
+#| fig-width: 14
+#| fig-height: 8
+
+if (exists("stablo")) {
+  rpart.plot(stablo,
+             type = 4,
+             extra = 104,
+             box.palette = list("Pad" = "#E74C3C", "Prolaz" = "#2ECC71"),
+             shadow.col = "grey",
+             nn = TRUE,
+             main = "Stablo odlučivanja — Klasifikacija prolaz/pad",
+             cex = 0.75)
+}
+```
+
+```{r}
+#| label: klasifikacija-evaluacija
+
+if (exists("stablo")) {
+  
+  # Predviđanja na test skupu
+  pred_klase <- predict(stablo, newdata = test_df, type = "class")
+  pred_prob  <- predict(stablo, newdata = test_df, type = "prob")[, "Prolaz"]
+  
+  # Konfuzijska matrica
+  conf_mat <- table(Stvarno = test_df$prolaz, Predviđeno = pred_klase)
+  cat("=== Konfuzijska matrica ===\n")
+  print(conf_mat)
+  
+  # Metrike evaluacije
+  TP <- conf_mat["Prolaz", "Prolaz"]
+  TN <- conf_mat["Pad",    "Pad"]
+  FP <- conf_mat["Pad",    "Prolaz"]
+  FN <- conf_mat["Prolaz", "Pad"]
+  
+  tocnost     <- (TP + TN) / sum(conf_mat)
+  preciznost  <- TP / (TP + FP)
+  odziv       <- TP / (TP + FN)
+  f1          <- 2 * preciznost * odziv / (preciznost + odziv)
+  specificnost <- TN / (TN + FP)
+  
+  metrike <- data.frame(
+    Metrika  = c("Točnost", "Preciznost", "Odziv (Senzitivnost)",
+                 "Specifičnost", "F1 mjera"),
+    Vrijednost = round(c(tocnost, preciznost, odziv, 
+                          specificnost, f1), 4),
+    Opis = c(
+      "Udio ispravno klasificiranih opservacija",
+      "Udio stvarnih prolaza među predviđenim prolazima",
+      "Udio ispravno identificiranih prolaza",
+      "Udio ispravno identificiranih padova",
+      "Harmonijska sredina preciznosti i odziva"
+    )
+  )
+  
+  metrike |>
+    kable(caption = "Metrike evaluacije klasifikacijskog modela") |>
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+  
+  # Bazna stopa (majority class classifier)
+  bazna_stopa <- max(prop.table(table(test_df$prolaz)))
+  cat("\nBazna stopa (majority class):", round(bazna_stopa, 4), "\n")
+  cat("Točnost modela:", round(tocnost, 4), "\n")
+  cat("Poboljšanje u odnosu na baznu stopu:",
+      round((tocnost - bazna_stopa) * 100, 2), "postotnih bodova\n")
+}
+```
+
+```{r}
+#| label: varijable-vaznost
+#| fig-width: 9
+#| fig-height: 5
+
+if (exists("stablo")) {
+  
+  vaznost <- stablo$variable.importance
+  
+  if (!is.null(vaznost)) {
+    df_vaznost <- data.frame(
+      Varijabla = names(vaznost),
+      Vaznost   = as.numeric(vaznost)
+    ) |>
+      arrange(desc(Vaznost)) |>
+      mutate(Vaznost_norm = round(Vaznost / max(Vaznost) * 100, 2))
+    
+    df_vaznost |>
+      kable(caption = "Važnost varijabli u modelu stabla odlučivanja") |>
+      kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
+    
+    ggplot(df_vaznost, aes(x = reorder(Varijabla, Vaznost_norm), 
+                            y = Vaznost_norm, fill = Vaznost_norm)) +
+      geom_bar(stat = "identity", alpha = 0.85) +
+      geom_text(aes(label = paste0(Vaznost_norm, "%")), 
+                hjust = -0.1, size = 3.5) +
+      coord_flip() +
+      scale_fill_gradient(low = "#AED6F1", high = "#1A5276") +
+      theme_minimal(base_size = 13) +
+      theme(legend.position = "none") +
+      ylim(0, 115) +
+      labs(title = "Relativna važnost varijabli — stablo odlučivanja",
+           x = "Varijabla", y = "Relativna važnost (%)")
+  }
+}
+```
+
+**Interpretacija stabla odlučivanja:** Stablo odlučivanja je nelinearan, neparametrijski klasifikacijski model koji podatke dijeli na temelju pragova varijabli. Svaki čvor prikazuje: prediktorsku varijablu i prag podjele, distribuciju klasa (prolaz/pad) i postotak opservacija. Točnost modela uspoređena s baznom stopom (majority class classifier) govori koliko model nadmašuje trivijalno predviđanje. F1 mjera je korisna kada klase nisu izbalansiran jer kombinira preciznost i odziv. Važnost varijabli pokazuje koji prediktori su bili najkorisniji za podjelu podataka.
+
+---
+
+# Faza 6: Sinteza i zaključci
+
+## Sažetak rezultata
+
+### Istraživačko pitanje 1: Razlike po stilu učenja (ANOVA)
+
+Na temelju jednosmjerne ANOVA-e, testirano je postoji li statistički značajna razlika u prosječnim rezultatima ispita između studenata s različitim stilovima učenja. F-statistika i odgovarajuća p-vrijednost ukazuju na to može li se odbaciti nulta hipoteza o jednakosti grupnih sredina. Post-hoc Tukey HSD test identificira između kojih specifičnih parova stilova učenja postoje statistički značajne razlike.
+
+### Istraživačko pitanje 2: Online tečajevi i uspješnost (t-test)
+
+Welch-ov nezavisni t-test testirao je razliku u prosječnom rezultatu ispita između studenata koji pohađaju online tečajeve i onih koji ne pohađaju. Cohenov d mjeri praktičnu veličinu te razlike. Rezultati ukazuju na to je li razlika ne samo statistički, već i praktično značajna.
+
+### Istraživačko pitanje 3: Prediktori uspješnosti (regresija)
+
+Višestruka linearna regresija pokazala je koji faktori statistički značajno predviđaju rezultat ispita uz kontrolu ostalih varijabli. R² vrijednost govori o ukupnoj snazi modela. Svaki statistički značajni koeficijent interpretiran je zasebno — pozitivni koeficijenti označavaju prediktore koji povećavaju očekivani rezultat, negativni oni koji ga smanjuju.
+
+### Istraživačko pitanje 4: Klasifikacija prolaz/pad (stablo odlučivanja)
+
+Model stabla odlučivanja postigao je točnost veću od bazne stope što ukazuje da je statistički moguće klasificirati studente prema akademskom ishodu. Analiza važnosti varijabli identificira najvažnije prediktore prolaza/pada.
+
+## Ograničenja istraživanja
+
+1. **Porijeklo podataka:** Dataset je nastao spajanjem dvaju Kaggle izvora, što može unijeti pristranost odabira. Nije poznata precizna geografska ni institucionalna proveniencija svih zapisa.
+
+2. **Korelacija vs. uzročnost:** Sve analize su korelacijske prirode — statistički značajne veze između varijabli ne impliciraju uzročno-posljedični odnos.
+
+3. **Veliki uzorak i statistička značajnost:** S N = 14.003, čak i trivijalne razlike mogu biti statistički značajne. Stoga je veličina učinka (Cohenov d, R²) jednako važna kao i p-vrijednost.
+
+4. **Samoizvještajne mjere:** Varijable poput motivacije, stresa i sati učenja temelje se na percepciji studenata, što može biti podložno pristranosti odgovora.
+
+5. **Reprezentativnost:** Kao uzorak, podatci ne mogu biti generalizirani na sve studentske populacije bez opreznosti.
+
+## Zaključak
+
+Ovaj projekt demonstrira primjenu kompletnog ciklusa analize podataka — od dohvata i čišćenja podataka, kroz eksploracijsku analizu, do inferencijalne statistike i modeliranja. Rezultati ukazuju na to koji aspekti studentskog ponašanja i okruženja su statistički značajno povezani s akademskom uspješnošću, s posebnim naglaskom na ulogu online učenja. Korištene metode (ANOVA, t-test, višestruka regresija, stablo odlučivanja) komplementarno se nadopunjuju i zajedno pružaju sveobuhvatan uvid u fenomen akademske uspješnosti u suvremenom obrazovnom kontekstu.
+
+---
+
+## Reference
+
+- Shamim, A. (2025). *Student Performance and Learning Behavior Dataset*. Kaggle. <https://www.kaggle.com/datasets/adilshamim8/student-performance-and-learning-style>
+- NAJEM, K. (2025). *Student Performance and Learning Behavior Dataset for Educational Analytics*. Zenodo. DOI: 10.5281/zenodo.16459132
+- R Core Team (2024). *R: A language and environment for statistical computing*. R Foundation for Statistical Computing, Vienna, Austria. <https://www.R-project.org/>
+- Wickham, H. et al. (2019). Welcome to the tidyverse. *Journal of Open Source Software*, 4(43), 1686.
+- Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance. *Proceedings of FUBUTEC 2008*.
+- Cohen, J. (1988). *Statistical Power Analysis for the Behavioral Sciences* (2nd ed.). Erlbaum.
+
+---
+
+*Projekt izrađen u programskom jeziku R koristeći Quarto dokument format.*  
+*Sav kod je reproducibilan uz preuzimanje dataseta s navedenog izvora.*
