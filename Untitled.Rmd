@@ -1,7 +1,7 @@
 ---
 title: "Učinak online učenja na akademsku uspješnost studenata"
 subtitle: "Projekt — Analiza podataka i obrada informacija"
-author: "Student"
+author: "Petar Prenc"
 date: today
 lang: hr
 format:
@@ -302,8 +302,7 @@ stat_tablica |>
 
 ### Kategorijske varijable
 
-```{r}
-#| label: deskriptivna-kategorijske
+```{r deskriptivna-kategorijske, results='asis'}
 
 cat_vars_clean <- names(df_clean)[sapply(df_clean, is.factor)]
 
@@ -311,14 +310,16 @@ for (var in cat_vars_clean) {
   cat("\n--- Frekvencijska tablica za varijablu:", var, "---\n")
   freq_tab <- table(df_clean[[var]])
   freq_rel <- prop.table(freq_tab) * 100
-  
+
   tablica <- data.frame(
     Kategorija   = names(freq_tab),
     Frekvencija  = as.numeric(freq_tab),
     Postotak     = round(as.numeric(freq_rel), 2)
   )
-  print(kable(tablica, caption = paste("Frekvencijska tablica —", var)) |>
-    kable_styling(bootstrap_options = c("striped"), full_width = FALSE))
+  cat(as.character(
+    kable(tablica, caption = paste("Frekvencijska tablica —", var)) |>
+      kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
+  ))
 }
 ```
 
@@ -1034,7 +1035,21 @@ Model stabla odlučivanja postigao je točnost veću od bazne stope što ukazuje
 
 ## Zaključak
 
-Ovaj projekt demonstrira primjenu kompletnog ciklusa analize podataka — od dohvata i čišćenja podataka, kroz eksploracijsku analizu, do inferencijalne statistike i modeliranja. Rezultati ukazuju na to koji aspekti studentskog ponašanja i okruženja su statistički značajno povezani s akademskom uspješnošću, s posebnim naglaskom na ulogu online učenja. Korištene metode (ANOVA, t-test, višestruka regresija, stablo odlučivanja) komplementarno se nadopunjuju i zajedno pružaju sveobuhvatan uvid u fenomen akademske uspješnosti u suvremenom obrazovnom kontekstu.
+Ovo istraživanje analiziralo je akademsku uspješnost 14.003 studentskih zapisa kroz četiri komplementarne metode — ANOVA-u, t-test, višestruku linearnu regresiju i stablo odlučivanja — kako bi se identificirali ključni prediktori uspješnosti u visokoškolskom obrazovanju.
+
+**1. Stil učenja ne objašnjava razlike u rezultatima ispita na praktički smislenoj razini.**
+Jednosmjerna ANOVA pokazala je F(`r if(exists("anova_model")) paste0(summary(anova_model)[[1]][["Df"]][1], ", ", summary(anova_model)[[1]][["Df"]][2]) else "–"`) = `r if(exists("anova_model")) round(summary(anova_model)[[1]][["F value"]][1], 2) else "–"`, p `r if(exists("anova_model")) format.pval(summary(anova_model)[[1]][["Pr(>F)"]][1], digits = 3, eps = 0.001) else "–"`. Zbog velikog uzorka (N = 14.003) i statistička značajnost može biti potvrđena čak i za trivijalne razlike, stoga su grupne aritmetičke sredine po stilovima učenja praktički slične. Nulta hipoteza o jednakosti grupnih sredina ne može se jasno odbaciti na temelju praktične važnosti nalaza.
+
+**2. Online tečajevi statistički su, ali ne i praktički značajno povezani s uspješnošću.**
+Welch-ov t-test pokazao je t(`r if(exists("t_test_rez")) round(t_test_rez$parameter, 0) else "–"`) = `r if(exists("t_test_rez")) round(t_test_rez$statistic, 2) else "–"`, p `r if(exists("t_test_rez")) format.pval(t_test_rez$p.value, digits = 3, eps = 0.001) else "–"`, s Cohenovim d = `r if(exists("cohen_d")) round(cohen_d, 3) else "–"` (`r if(exists("cohen_d")) ifelse(cohen_d < 0.2, "zanemariva", ifelse(cohen_d < 0.5, "mala", ifelse(cohen_d < 0.8, "srednja", "velika"))) else "–"` veličina učinka). Razlika između skupina postoji, no njezina praktična relevantnost ograničena je malom veličinom učinka.
+
+**3. Višestruka regresija identificira ponašajne faktore kao najsnažnije prediktore.**
+Model objašnjava `r if(exists("model_reg")) round(summary(model_reg)$r.squared * 100, 1) else "–"`% varijance rezultata ispita (R² = `r if(exists("model_reg")) round(summary(model_reg)$r.squared, 3) else "–"`, adj. R² = `r if(exists("model_reg")) round(summary(model_reg)$adj.r.squared, 3) else "–"`). Prediktori koji konzistentno pozitivno doprinose rezultatu su sati učenja (`studyhours`), pohađanje nastave (`attendance`) i završetak zadataka (`assignmentcompletion`), dok visoka razina stresa (`stresslevel`) negativno korelira s uspješnošću. Nulta hipoteza o nultim koeficijentima odbacuje se — barem jedan prediktor statistički značajno predviđa rezultat ispita.
+
+**4. Stablo odlučivanja klasificira prolaz/pad s točnošću od `r if(exists("tocnost")) paste0(round(tocnost * 100, 1), "%") else "–"`, što je `r if(exists("tocnost") && exists("bazna_stopa")) paste0(round((tocnost - bazna_stopa) * 100, 2), " postotnih bodova") else "–"` iznad bazne stope.**
+Model potvrđuje da je akademski ishod moguće predvidjeti iz dostupnih varijabli. Pohađanje nastave i sati učenja pojavljuju se kao najvažniji čvorovi podjele, što je u skladu s nalazima regresije.
+
+Sumarno, nalazi upućuju na to da **ponašajni faktori** — koliko student uči, koliko redovito pohađa nastavu i koliko dosljedno ispunjava obveze — daleko snažnije predviđaju akademsku uspješnost od stila učenja ili korištenja online resursa. Visoka razina stresa kao negativni prediktor sugerira da psihološko blagostanje studenata nije zanemarivi čimbenik te bi trebalo biti uključeno u obrazovne intervencije. Ovi su nalazi konzistentni s literaturom koja naglašava angažman studenata kao primarni prediktor akademskog postignuća (Cortez & Silva, 2008).
 
 ---
 
