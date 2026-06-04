@@ -1007,49 +1007,51 @@ if (exists("stablo")) {
 
 ### Istraživačko pitanje 1: Razlike po stilu učenja (ANOVA)
 
-Na temelju jednosmjerne ANOVA-e, testirano je postoji li statistički značajna razlika u prosječnim rezultatima ispita između studenata s različitim stilovima učenja. F-statistika i odgovarajuća p-vrijednost ukazuju na to može li se odbaciti nulta hipoteza o jednakosti grupnih sredina. Post-hoc Tukey HSD test identificira između kojih specifičnih parova stilova učenja postoje statistički značajne razlike.
+Jednosmjerna ANOVA i Welch-ANOVA testirale su postoji li statistički značajna razlika u prosječnim rezultatima ispita između četiri stila učenja. Rezultat je jednoznačan: **H₀ se ne odbacuje** (F = 1.57, p = 0.194). Tukey HSD post-hoc test nije pronašao niti jedan statistički značajan par skupina. Grupne aritmetičke sredine razlikuju se za manje od jednog boda na 100-bodnoj skali, što ne predstavlja praktički relevantnu razliku.
 
 ### Istraživačko pitanje 2: Online tečajevi i uspješnost (t-test)
 
-Welch-ov nezavisni t-test testirao je razliku u prosječnom rezultatu ispita između studenata koji pohađaju online tečajeve i onih koji ne pohađaju. Cohenov d mjeri praktičnu veličinu te razlike. Rezultati ukazuju na to je li razlika ne samo statistički, već i praktično značajna.
+Welch-ov nezavisni t-test testirao je razliku u prosječnom rezultatu ispita između studenata koji pohađaju online tečajeve i onih koji ne pohađaju. **H₀ se ne odbacuje** (t = −1.95, p = 0.052 > α = 0.05). Čak i kada bi razlika bila statistički značajna, Cohenov d = 0.081 označava zanemarivo malu veličinu učinka — razlika sredina iznosi svega 1.43 boda u korist studenata s online tečajevima.
 
 ### Istraživačko pitanje 3: Prediktori uspješnosti (regresija)
 
-Višestruka linearna regresija pokazala je koji faktori statistički značajno predviđaju rezultat ispita uz kontrolu ostalih varijabli. R² vrijednost govori o ukupnoj snazi modela. Svaki statistički značajni koeficijent interpretiran je zasebno — pozitivni koeficijenti označavaju prediktore koji povećavaju očekivani rezultat, negativni oni koji ga smanjuju.
+Višestruka linearna regresija pokazala je da model u cjelini objašnjava samo **0.27% varijance** rezultata ispita (R² = 0.003). Statistički značajni prediktori su jedino `stresslevel` (β = −0.79, p < 0.001) i `assignmentcompletion` (β = 0.033, p = 0.002) te `onlinecourses` (β = 0.060, p = 0.021), dok `studyhours` (p = 0.607), `attendance` (p = 0.084), `motivation` (p = 0.656) i `age` (p = 0.251) nisu statistički značajni. Model formalno odbacuje H₀ o nultim koeficijentima isključivo zbog velikog uzorka, no praktička prediktivna snaga je zanemariva.
 
 ### Istraživačko pitanje 4: Klasifikacija prolaz/pad (stablo odlučivanja)
 
-Model stabla odlučivanja postigao je točnost veću od bazne stope što ukazuje da je statistički moguće klasificirati studente prema akademskom ishodu. Analiza važnosti varijabli identificira najvažnije prediktore prolaza/pada.
+Model stabla odlučivanja postigao je točnost od 55.0% u odnosu na baznu stopu od 51.4% (+3.61 postotnih bodova). Poboljšanje je mjerljivo, ali iznimno malo i praktički beznačajno. Model jedva nadmašuje trivijalno predviđanje (majority class classifier), što odražava slabe prediktivne odnose u datasetu.
 
 ## Ograničenja istraživanja
 
 1. **Porijeklo podataka:** Dataset je nastao spajanjem dvaju Kaggle izvora, što može unijeti pristranost odabira. Nije poznata precizna geografska ni institucionalna proveniencija svih zapisa.
 
-2. **Korelacija vs. uzročnost:** Sve analize su korelacijske prirode — statistički značajne veze između varijabli ne impliciraju uzročno-posljedični odnos.
+2. **Sintetička priroda podataka:** Distribucije ključnih varijabli (dob, stil učenja, spol) iznimno su uniformne, a korelacije između svih prediktora i ExamScore praktički su nulte (max |r| = 0.033). Pronađeno je 1.534 identičnih duplikata koji se pojavljuju u pravilnim skupinama. Ovi pokazatelji snažno upućuju na to da je dataset sintetički generiran, a ne prikupljen mjerenjem stvarnih studentskih ishoda. To je najvažnije ograničenje koje treba uzeti u obzir pri interpretaciji svih nalaza.
 
-3. **Veliki uzorak i statistička značajnost:** S N = 14.003, čak i trivijalne razlike mogu biti statistički značajne. Stoga je veličina učinka (Cohenov d, R²) jednako važna kao i p-vrijednost.
+3. **Korelacija vs. uzročnost:** Sve analize su korelacijske prirode — statistički značajne veze između varijabli ne impliciraju uzročno-posljedični odnos.
 
-4. **Samoizvještajne mjere:** Varijable poput motivacije, stresa i sati učenja temelje se na percepciji studenata, što može biti podložno pristranosti odgovora.
+4. **Veliki uzorak i statistička značajnost:** S N = 12.469 (nakon uklanjanja duplikata), čak i trivijalne razlike mogu biti statistički značajne. Stoga je veličina učinka (Cohenov d, R²) jednako važna kao i p-vrijednost.
 
-5. **Reprezentativnost:** Kao uzorak, podatci ne mogu biti generalizirani na sve studentske populacije bez opreznosti.
+5. **Samoizvještajne mjere:** Varijable poput motivacije, stresa i sati učenja temelje se na percepciji studenata, što može biti podložno pristranosti odgovora.
+
+6. **Reprezentativnost:** Kao uzorak, podatci ne mogu biti generalizirani na sve studentske populacije bez opreznosti.
 
 ## Zaključak
 
 Ovo istraživanje analiziralo je akademsku uspješnost 14.003 studentskih zapisa kroz četiri komplementarne metode — ANOVA-u, t-test, višestruku linearnu regresiju i stablo odlučivanja — kako bi se identificirali ključni prediktori uspješnosti u visokoškolskom obrazovanju.
 
-**1. Stil učenja ne objašnjava razlike u rezultatima ispita na praktički smislenoj razini.**
-Jednosmjerna ANOVA pokazala je F(`r if(exists("anova_model")) paste0(summary(anova_model)[[1]][["Df"]][1], ", ", summary(anova_model)[[1]][["Df"]][2]) else "–"`) = `r if(exists("anova_model")) round(summary(anova_model)[[1]][["F value"]][1], 2) else "–"`, p `r if(exists("anova_model")) format.pval(summary(anova_model)[[1]][["Pr(>F)"]][1], digits = 3, eps = 0.001) else "–"`. Zbog velikog uzorka (N = 14.003) i statistička značajnost može biti potvrđena čak i za trivijalne razlike, stoga su grupne aritmetičke sredine po stilovima učenja praktički slične. Nulta hipoteza o jednakosti grupnih sredina ne može se jasno odbaciti na temelju praktične važnosti nalaza.
+**1. Stil učenja ne objašnjava razlike u rezultatima ispita — H₀ se ne odbacuje.**
+Jednosmjerna ANOVA pokazala je F(`r if(exists("anova_model")) paste0(summary(anova_model)[[1]][["Df"]][1], ", ", summary(anova_model)[[1]][["Df"]][2]) else "–"`) = `r if(exists("anova_model")) round(summary(anova_model)[[1]][["F value"]][1], 2) else "–"`, p = `r if(exists("anova_model")) format.pval(summary(anova_model)[[1]][["Pr(>F)"]][1], digits = 3, eps = 0.001) else "–"`. Nulta hipoteza o jednakosti grupnih sredina **ne odbacuje se** — razlika nije statistički značajna. Welch-ANOVA potvrđuje isti zaključak (p = 0.2). Tukey HSD post-hoc test nije pronašao niti jedan statistički značajan par. Grupne sredine razlikuju se za manje od jednog boda, što je zanemariva praktična razlika.
 
-**2. Online tečajevi statistički su, ali ne i praktički značajno povezani s uspješnošću.**
-Welch-ov t-test pokazao je t(`r if(exists("t_test_rez")) round(t_test_rez$parameter, 0) else "–"`) = `r if(exists("t_test_rez")) round(t_test_rez$statistic, 2) else "–"`, p `r if(exists("t_test_rez")) format.pval(t_test_rez$p.value, digits = 3, eps = 0.001) else "–"`, s Cohenovim d = `r if(exists("cohen_d")) round(cohen_d, 3) else "–"` (`r if(exists("cohen_d")) ifelse(cohen_d < 0.2, "zanemariva", ifelse(cohen_d < 0.5, "mala", ifelse(cohen_d < 0.8, "srednja", "velika"))) else "–"` veličina učinka). Razlika između skupina postoji, no njezina praktična relevantnost ograničena je malom veličinom učinka.
+**2. Online tečajevi nisu statistički niti praktički značajno povezani s uspješnošću — H₀ se ne odbacuje.**
+Welch-ov t-test pokazao je t(`r if(exists("t_test_rez")) round(t_test_rez$parameter, 0) else "–"`) = `r if(exists("t_test_rez")) round(t_test_rez$statistic, 2) else "–"`, p = `r if(exists("t_test_rez")) format.pval(t_test_rez$p.value, digits = 3, eps = 0.001) else "–"`. Budući da je p > 0.05, **H₀ se ne odbacuje** — razlika u prosječnim rezultatima između skupina nije statistički značajna pri odabranoj razini značajnosti. Cohenov d = `r if(exists("cohen_d")) round(cohen_d, 3) else "–"` (`r if(exists("cohen_d")) ifelse(cohen_d < 0.2, "zanemariva", ifelse(cohen_d < 0.5, "mala", ifelse(cohen_d < 0.8, "srednja", "velika"))) else "–"` veličina učinka) potvrđuje da čak i opažena razlika od 1.43 boda nema praktičnu relevantnost.
 
-**3. Višestruka regresija identificira ponašajne faktore kao najsnažnije prediktore.**
-Model objašnjava `r if(exists("model_reg")) round(summary(model_reg)$r.squared * 100, 1) else "–"`% varijance rezultata ispita (R² = `r if(exists("model_reg")) round(summary(model_reg)$r.squared, 3) else "–"`, adj. R² = `r if(exists("model_reg")) round(summary(model_reg)$adj.r.squared, 3) else "–"`). Prediktori koji konzistentno pozitivno doprinose rezultatu su sati učenja (`studyhours`), pohađanje nastave (`attendance`) i završetak zadataka (`assignmentcompletion`), dok visoka razina stresa (`stresslevel`) negativno korelira s uspješnošću. Nulta hipoteza o nultim koeficijentima odbacuje se — barem jedan prediktor statistički značajno predviđa rezultat ispita.
+**3. Višestruka regresija otkriva izrazito slabu prediktivnu snagu svih analiziranih varijabli.**
+Model objašnjava svega `r if(exists("model_reg")) round(summary(model_reg)$r.squared * 100, 1) else "–"`% varijance rezultata ispita (R² = `r if(exists("model_reg")) round(summary(model_reg)$r.squared, 3) else "–"`, adj. R² = `r if(exists("model_reg")) round(summary(model_reg)$adj.r.squared, 3) else "–"`), što je praktički zanemariva prediktivna snaga. Jedini statistički značajni prediktori su `stresslevel` (β = −0.79, p < 0.001) i `assignmentcompletion` (β = 0.033, p = 0.002) te `onlinecourses` (β = 0.060, p = 0.021). Nasuprot tome, `studyhours` (p = 0.607), `attendance` (p = 0.084), `motivation` (p = 0.656) i `age` (p = 0.251) **nisu statistički značajni prediktori**. Nulta hipoteza formalno se odbacuje zbog velikog uzorka, ali praktička vrijednost modela gotovo ne postoji.
 
-**4. Stablo odlučivanja klasificira prolaz/pad s točnošću od `r if(exists("tocnost")) paste0(round(tocnost * 100, 1), "%") else "–"`, što je `r if(exists("tocnost") && exists("bazna_stopa")) paste0(round((tocnost - bazna_stopa) * 100, 2), " postotnih bodova") else "–"` iznad bazne stope.**
-Model potvrđuje da je akademski ishod moguće predvidjeti iz dostupnih varijabli. Pohađanje nastave i sati učenja pojavljuju se kao najvažniji čvorovi podjele, što je u skladu s nalazima regresije.
+**4. Stablo odlučivanja jedva nadmašuje slučajno pogađanje — smislena klasifikacija nije postignuta.**
+Model je postigao točnost od `r if(exists("tocnost")) paste0(round(tocnost * 100, 1), "%") else "–"` u odnosu na baznu stopu od `r if(exists("bazna_stopa")) paste0(round(bazna_stopa * 100, 1), "%") else "–"` — poboljšanje od samo `r if(exists("tocnost") && exists("bazna_stopa")) paste0(round((tocnost - bazna_stopa) * 100, 2), " postotnih bodova") else "–"`. Takvo marginalno poboljšanje ne može se smatrati dokazom da je akademski ishod moguće pouzdano predvidjeti iz dostupnih varijabli. Pohađanje nastave i sati učenja pojavljuju se kao čvorovi u stablu, no ta podjela ne rezultira smislenim prediktivnim poboljšanjem.
 
-Sumarno, nalazi upućuju na to da **ponašajni faktori** — koliko student uči, koliko redovito pohađa nastavu i koliko dosljedno ispunjava obveze — daleko snažnije predviđaju akademsku uspješnost od stila učenja ili korištenja online resursa. Visoka razina stresa kao negativni prediktor sugerira da psihološko blagostanje studenata nije zanemarivi čimbenik te bi trebalo biti uključeno u obrazovne intervencije. Ovi su nalazi konzistentni s literaturom koja naglašava angažman studenata kao primarni prediktor akademskog postignuća (Cortez & Silva, 2008).
+Sumarno, sva četiri primijenjena modela daju konzistentan zaključak: **dostupne varijable u ovom datasetu ne predviđaju akademsku uspješnost na praktički smislenoj razini.** Jedina statistički robustna asocijacija jest negativna veza razine stresa s rezultatom ispita (`stresslevel`, p < 0.001), no i ta veza objašnjava zanemarivi udio varijance unutar modela koji ukupno dostiže R² = 0.003. Ovaj nalaz ne proturječi literaturi o angažmanu studenata (Cortez & Silva, 2008), već upućuje na to da korišteni dataset — vjerojatno sintetički generiran — ne reflektira stvarne obrazovne odnose koje literatura dokumentira na empirijskim podatcima.
 
 ---
 
