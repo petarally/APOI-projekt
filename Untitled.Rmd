@@ -298,7 +298,7 @@ stat_tablica |>
   scroll_box(width = "100%")
 ```
 
-**Interpretacija:** Aritmetička sredina predstavlja prosječnu vrijednost varijable u uzorku. Medijan je robusniji pokazatelj središnje tendencije koji nije osjetljiv na ekstremne vrijednosti (outliere). Mod označava najčešće pojavljenu vrijednost. Standardna devijacija i varijanca mjere raspršenost podataka oko srednje vrijednosti, dok IQR (interkvartilni raspon) opisuje srednju polovicu distribucije. Asimetričnost (skewness) > 0 ukazuje na pozitivno zakošenu distribuciju (rep prema višim vrijednostima), a vrijednosti < 0 na negativno zakošenu. Spljoštenost (kurtosis) > 3 ukazuje na leptokurtičnu (šiljatiju od normalne) distribuciju.
+**Interpretacija:** U uzorku od 12.469 studenata, **rezultat ispita** (examscore) ima srednju vrijednost 70.31 (medijan = 70, SD = 17.70), uz raspon od 40 do 100 bodova — distribucija je gotovo simetrična (skewness = −0.015). Prosječno **pohađanje nastave** iznosi 80.24% (SD = 11.47 pp), dok studenti prosječno posvećuju **20 sati tjedno učenju** (SD = 6.05, raspon 5–44 sata). **Završetak zadataka** dostiže prosječno 74.52% (SD = 14.66), a prosječna **dob** studenata je 23.5 godina (SD = 3.51, raspon 18–29). **Razina stresa** (skala 0–2) pokazuje negativnu asimetričnost (skewness = −0.595), što indicira da su studenti skloniji višim razinama stresa — medijan i mod su na vrijednosti 2. Vrijednosti kurtosis bliske −1.2 za gotovo sve varijable ukazuju na platikurtične (plosate) distribucije, konzistentne s uniformnom raspodjelom vidljivom u histogramima — što je nekarakteristično za stvarne obrazovne podatke.
 
 ### Kategorijske varijable
 
@@ -398,16 +398,18 @@ if ("learningstyle" %in% names(df_clean)) {
 
 # Gender distribucija
 if ("gender" %in% names(df_clean)) {
+  spol_labele <- c("0" = "Ženski", "1" = "Muški", "2" = "Ostalo")
   p2 <- df_clean |>
     count(gender) |>
-    ggplot(aes(x = gender, y = n, fill = gender)) +
+    mutate(spol = spol_labele[as.character(gender)]) |>
+    ggplot(aes(x = spol, y = n, fill = spol)) +
     geom_bar(stat = "identity", alpha = 0.85, width = 0.5) +
     geom_text(aes(label = n), vjust = -0.3, size = 4) +
-    scale_fill_manual(values = c("#E74C3C", "#3498DB", "#2ECC71")) +
+    scale_fill_manual(values = c("Ženski" = "#E74C3C", "Muški" = "#3498DB", "Ostalo" = "#2ECC71")) +
     theme_minimal(base_size = 12) +
     theme(legend.position = "none") +
-    labs(title = "Distribucija varijable gender (kodiranje 0/1/2)",
-         x = "Kodirana vrijednost", y = "Broj studenata")
+    labs(title = "Raspodjela studenata prema spolu",
+         x = "Spol", y = "Broj studenata")
   print(p2)
 }
 ```

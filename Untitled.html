@@ -170,7 +170,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">9. lipnja 2026.</p>
+      <p class="date">11. lipnja 2026.</p>
     </div>
   </div>
   
@@ -968,7 +968,7 @@ Data.frame spreman za analizu.</code></pre>
 
 </div>
 </div>
-<p><strong>Interpretacija:</strong> Aritmetička sredina predstavlja prosječnu vrijednost varijable u uzorku. Medijan je robusniji pokazatelj središnje tendencije koji nije osjetljiv na ekstremne vrijednosti (outliere). Mod označava najčešće pojavljenu vrijednost. Standardna devijacija i varijanca mjere raspršenost podataka oko srednje vrijednosti, dok IQR (interkvartilni raspon) opisuje srednju polovicu distribucije. Asimetričnost (skewness) &gt; 0 ukazuje na pozitivno zakošenu distribuciju (rep prema višim vrijednostima), a vrijednosti &lt; 0 na negativno zakošenu. Spljoštenost (kurtosis) &gt; 3 ukazuje na leptokurtičnu (šiljatiju od normalne) distribuciju.</p>
+<p><strong>Interpretacija:</strong> U uzorku od 12.469 studenata, <strong>rezultat ispita</strong> (examscore) ima srednju vrijednost 70.31 (medijan = 70, SD = 17.70), uz raspon od 40 do 100 bodova — distribucija je gotovo simetrična (skewness = −0.015). Prosječno <strong>pohađanje nastave</strong> iznosi 80.24% (SD = 11.47 pp), dok studenti prosječno posvećuju <strong>20 sati tjedno učenju</strong> (SD = 6.05, raspon 5–44 sata). <strong>Završetak zadataka</strong> dostiže prosječno 74.52% (SD = 14.66), a prosječna <strong>dob</strong> studenata je 23.5 godina (SD = 3.51, raspon 18–29). <strong>Razina stresa</strong> (skala 0–2) pokazuje negativnu asimetričnost (skewness = −0.595), što indicira da su studenti skloniji višim razinama stresa — medijan i mod su na vrijednosti 2. Vrijednosti kurtosis bliske −1.2 za gotovo sve varijable ukazuju na platikurtične (plosate) distribucije, konzistentne s uniformnom raspodjelom vidljivom u histogramima — što je nekarakteristično za stvarne obrazovne podatke.</p>
 </section>
 <section id="kategorijske-varijable" class="level3" data-number="4.1.2">
 <h3 data-number="4.1.2" class="anchored" data-anchor-id="kategorijske-varijable"><span class="header-section-number">4.1.2</span> Kategorijske varijable</h3>
@@ -1459,7 +1459,7 @@ Prolaz
 </div>
 </div>
 </div>
-<p><strong>Interpretacija:</strong> Histogrami prikazuju distribuciju svake numeričke varijable. Simetrična, zvonolika distribucija upućuje na normalnost. Vidljivi repovi prema desno ili lijevo indiciraju asimetričnost distribucije što je relevantno za odabir statističkih testova.</p>
+<p><strong>Interpretacija:</strong> Varijable <code>studyhours</code>, <code>attendance</code>, <code>motivation</code> i <code>stresslevel</code> pokazuju gotovo savršeno ravnomjerne (uniformne) distribucije bez ikakve zakošenosti — što je iznimno neuobičajeno za stvarno prikupljene podatke. Varijabla <code>examscore</code> blago je pozitivno zakošena (rep prema višim vrijednostima), dok <code>age</code> i <code>assignmentcompletion</code> pokazuju grublje, diskretne distribucije. Odsutnost zvonoliko oblikovanih distribucija konzistentna je s pretpostavkom o sintetičkoj prirodi dataseta.</p>
 </section>
 <section id="box-plotovi-i-outlieri" class="level3" data-number="4.2.2">
 <h3 data-number="4.2.2" class="anchored" data-anchor-id="box-plotovi-i-outlieri"><span class="header-section-number">4.2.2</span> Box-plotovi i outlieri</h3>
@@ -1485,7 +1485,7 @@ Prolaz
 </div>
 </div>
 </div>
-<p><strong>Interpretacija:</strong> Box-plot prikazuje medijan (srednja linija), interkvartilni raspon (kutija), raspon bez outliera (brkovi) i outliere (crvene točke). Outlieri su vrijednosti koje se nalaze više od 1.5 puta IQR iznad trećeg ili ispod prvog kvartila. Prisutnost outliera može utjecati na parametrijske testove i regresijske modele.</p>
+<p><strong>Interpretacija:</strong> Kutije većine varijabli su simetrične s minimalnom razlikom između medijana i kvartila, što potvrđuje uniformnu raspodjelu vidljivu u histogramima. Outlieri (crvene točke) pojavljuju se samo sporadično i ne predstavljaju ozbiljan problem. Varijabla <code>examscore</code> ima nešto širi IQR i vidljiviju asimetriju kutije u odnosu na ostale varijable, no i dalje bez izraženih grupacija ekstremnih vrijednosti.</p>
 </section>
 <section id="stupčasti-dijagrami-kategorijskih-varijabli" class="level3" data-number="4.2.3">
 <h3 data-number="4.2.3" class="anchored" data-anchor-id="stupčasti-dijagrami-kategorijskih-varijabli"><span class="header-section-number">4.2.3</span> Stupčasti dijagrami kategorijskih varijabli</h3>
@@ -1514,18 +1514,20 @@ Prolaz
 </div>
 <div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Gender distribucija</span></span>
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="st">"gender"</span> <span class="sc">%in%</span> <span class="fu">names</span>(df_clean)) {</span>
-<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>  p2 <span class="ot">&lt;-</span> df_clean <span class="sc">|&gt;</span></span>
-<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">count</span>(gender) <span class="sc">|&gt;</span></span>
-<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> gender, <span class="at">y =</span> n, <span class="at">fill =</span> gender)) <span class="sc">+</span></span>
-<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_bar</span>(<span class="at">stat =</span> <span class="st">"identity"</span>, <span class="at">alpha =</span> <span class="fl">0.85</span>, <span class="at">width =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
-<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_text</span>(<span class="fu">aes</span>(<span class="at">label =</span> n), <span class="at">vjust =</span> <span class="sc">-</span><span class="fl">0.3</span>, <span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"#E74C3C"</span>, <span class="st">"#3498DB"</span>, <span class="st">"#2ECC71"</span>)) <span class="sc">+</span></span>
-<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>) <span class="sc">+</span></span>
-<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"none"</span>) <span class="sc">+</span></span>
-<span id="cb43-11"><a href="#cb43-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Distribucija po spolu"</span>,</span>
-<span id="cb43-12"><a href="#cb43-12" aria-hidden="true" tabindex="-1"></a>         <span class="at">x =</span> <span class="st">"Spol"</span>, <span class="at">y =</span> <span class="st">"Broj studenata"</span>)</span>
-<span id="cb43-13"><a href="#cb43-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p2)</span>
-<span id="cb43-14"><a href="#cb43-14" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>  spol_labele <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"0"</span> <span class="ot">=</span> <span class="st">"Ženski"</span>, <span class="st">"1"</span> <span class="ot">=</span> <span class="st">"Muški"</span>, <span class="st">"2"</span> <span class="ot">=</span> <span class="st">"Ostalo"</span>)</span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>  p2 <span class="ot">&lt;-</span> df_clean <span class="sc">|&gt;</span></span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">count</span>(gender) <span class="sc">|&gt;</span></span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">spol =</span> spol_labele[<span class="fu">as.character</span>(gender)]) <span class="sc">|&gt;</span></span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> spol, <span class="at">y =</span> n, <span class="at">fill =</span> spol)) <span class="sc">+</span></span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_bar</span>(<span class="at">stat =</span> <span class="st">"identity"</span>, <span class="at">alpha =</span> <span class="fl">0.85</span>, <span class="at">width =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_text</span>(<span class="fu">aes</span>(<span class="at">label =</span> n), <span class="at">vjust =</span> <span class="sc">-</span><span class="fl">0.3</span>, <span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"Ženski"</span> <span class="ot">=</span> <span class="st">"#E74C3C"</span>, <span class="st">"Muški"</span> <span class="ot">=</span> <span class="st">"#3498DB"</span>, <span class="st">"Ostalo"</span> <span class="ot">=</span> <span class="st">"#2ECC71"</span>)) <span class="sc">+</span></span>
+<span id="cb43-11"><a href="#cb43-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>) <span class="sc">+</span></span>
+<span id="cb43-12"><a href="#cb43-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"none"</span>) <span class="sc">+</span></span>
+<span id="cb43-13"><a href="#cb43-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Raspodjela studenata prema spolu"</span>,</span>
+<span id="cb43-14"><a href="#cb43-14" aria-hidden="true" tabindex="-1"></a>         <span class="at">x =</span> <span class="st">"Spol"</span>, <span class="at">y =</span> <span class="st">"Broj studenata"</span>)</span>
+<span id="cb43-15"><a href="#cb43-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p2)</span>
+<span id="cb43-16"><a href="#cb43-16" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -1603,7 +1605,7 @@ Prolaz
 </div>
 </div>
 </div>
-<p><strong>Interpretacija:</strong> Korelacijska matrica prikazuje Pearsonove koeficijente korelacije između svih parova numeričkih varijabli. Vrijednosti bliže +1 (tamno plava) ukazuju na jaku pozitivnu korelaciju, vrijednosti bliže -1 (tamno crvena) na jaku negativnu korelaciju, a vrijednosti oko 0 na odsutnost linearne veze. Korelacije između prediktorskih varijabli &gt; |0.7| mogu ukazivati na multikolinearnost koja može biti problematična u regresijskim modelima.</p>
+<p><strong>Interpretacija:</strong> Sve korelacije u matrici iznimno su niske (max |r| ≈ 0.03) — niti jedan par varijabli ne dijeli smislenu linearnu vezu. Korelacija između <code>studyhours</code> i <code>examscore</code>, koja se u obrazovnoj literaturi redovito nalazi u rasponu r = 0.3–0.6, ovdje je gotovo nulta. Takva univerzalna odsutnost korelacija jedan je od najjasnijih pokazatelja sintetičke prirode dataseta. Multikolinearnost između prediktora nije problem, ali ni prediktivni potencijal varijabli ne postoji.</p>
 </section>
 </section>
 <section id="provjera-normalnosti-distribucije" class="level2" data-number="4.3">
@@ -1630,7 +1632,7 @@ Prolaz
 </div>
 </div>
 </div>
-<p><strong>Interpretacija:</strong> Q-Q (quantile-quantile) plot uspoređuje kvantile distribucije varijable s kvantilima normalne distribucije. Ako točke leže blizu crvene dijagonale, distribucija je normalna. Odstupanja u repovima (S-oblik ili obrnuti S-oblik) ukazuju na asimetričnost ili debelorepe distribucije.</p>
+<p><strong>Interpretacija:</strong> Niti jedna varijabla ne prati normalnu dijagonalu. Varijable s diskretnim vrijednostima (<code>age</code>, <code>onlinecourses</code>) pokazuju karakteristični stepeničasti uzorak — točke se grupiraju u horizontalne segmente umjesto da teku kontinuirano uzduž pravca. Varijabla <code>examscore</code> ima blago S-odstupanje što ukazuje na lakše repove od normalne distribucije. Sve varijable sustavno odstupaju, konzistentno s uniformnim distribucijama u histogramima.</p>
 </section>
 <section id="shapiro-wilk-test-normalnosti" class="level3" data-number="4.3.2">
 <h3 data-number="4.3.2" class="anchored" data-anchor-id="shapiro-wilk-test-normalnosti"><span class="header-section-number">4.3.2</span> Shapiro-Wilk test normalnosti</h3>
@@ -1757,7 +1759,7 @@ Prolaz
 
 </div>
 </div>
-<p><strong>Interpretacija:</strong> Shapiro-Wilk i Anderson-Darling testovi testiraju nultu hipotezu H₀: distribucija je normalna. Ako je p-vrijednost &lt; 0.05, odbacujemo H₀ i zaključujemo da distribucija nije normalna. Napomena: s velikim uzorcima (N &gt; 5.000) ovi testovi postaju izuzetno osjetljivi i odbacuju normalnost čak i pri minimalnim odstupanjima. Zbog toga je vizualna provjera Q-Q plotom ravnopravno važna. Prema Centralnom graničnom teoremu, za velike uzorke (N &gt; 30) parametrijski testovi su robustni i pri umjerenim odstupanjima od normalnosti.</p>
+<p><strong>Interpretacija:</strong> Oba testa odbacuju H₀ o normalnosti za sve varijable (p &lt; 0.05). Budući da je uzorak velik (N &gt; 12.000), ova osjetljivost je očekivana — i minimalna odstupanja od normalne distribucije dovode do statistički značajnog rezultata. Vizualni uvid iz Q-Q plotova potvrđuje da se distribucije suštinski razlikuju od normalne zbog uniformne raspodjele i diskretnih skokova. Za daljnje parametrijske analize (ANOVA, t-test) oslanjamo se na robustnost uz velik uzorak (Centralni granični teorem).</p>
 <hr>
 </section>
 </section>
@@ -1959,7 +1961,7 @@ $learningstyle
 </div>
 </div>
 </div>
-<p><strong>Interpretacija ANOVA:</strong> ANOVA testira jesu li prosječni rezultati ispita jednaki u svim grupama stilova učenja. F-statistika mjeri omjer varijance između grupa i varijance unutar grupa. Visoka F-vrijednost i niska p-vrijednost (&lt; 0.05) ukazuju da razlike između grupa nisu nastale slučajno. Tukey HSD post-hoc test identificira koje specifične parove grupa se statistički značajno razlikuju uz kontrolu greške tipa I.</p>
+<p><strong>Interpretacija ANOVA:</strong> ANOVA nije detektirala statistički značajnu razliku u rezultatima ispita između stilova učenja (F = 1.57, p = 0.194). Tukey HSD post-hoc test nije pronašao niti jedan statistički značajan par skupina — sve p-vrijednosti parova premašuju α = 0.05. Box-plotovi vizualno potvrđuju gotovo identične distribucije i aritmetičke sredine (crni rombovi) za sve stilove učenja — grupne sredine razlikuju se za manje od jednog boda. <strong>H₀ se ne odbacuje.</strong></p>
 </section>
 <section id="nezavisni-t-test-online-tečajevi-i-rezultat-ispita" class="level3" data-number="6.1.2">
 <h3 data-number="6.1.2" class="anchored" data-anchor-id="nezavisni-t-test-online-tečajevi-i-rezultat-ispita"><span class="header-section-number">6.1.2</span> Nezavisni t-test: Online tečajevi i rezultat ispita</h3>
@@ -2069,7 +2071,7 @@ Interpretacija: zanemariva veličina učinka</code></pre>
 </div>
 </div>
 </div>
-<p><strong>Interpretacija t-testa:</strong> Welch-ov t-test koristi se jer ne pretpostavlja jednake varijance skupina. t-statistika mjeri razliku između aritmetičkih sredina u standardiziranim jedinicama. p-vrijednost &lt; 0.05 znači da je razlika statistički značajna, tj. nije nastala slučajno. Cohenov d mjeri praktičnu važnost razlike: d &lt; 0.2 (zanemariva), 0.2–0.5 (mala), 0.5–0.8 (srednja), &gt; 0.8 (velika veličina učinka).</p>
+<p><strong>Interpretacija t-testa:</strong> Welch-ov t-test nije pokazao statistički značajnu razliku u rezultatima ispita između dviju skupina (t = -1.95, p = 0.0521). Budući da je p &gt; α = 0.05, <strong>H₀ se ne odbacuje</strong>. Cohenov d = 0.081 indicira zanemarivo malu veličinu učinka — razlika od 1.43 boda između skupina nema praktičnu relevantnost. Violinski prikaz vizualno potvrđuje gotovo identičan oblik i raspodjelu rezultata u obje skupine.</p>
 </section>
 </section>
 <section id="kvantifikacija-odnosa-višestruka-linearna-regresija" class="level2" data-number="6.2">
@@ -2261,7 +2263,7 @@ R² = 0.0027 </code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb70"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb70-1"><a href="#cb70-1" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mfrow =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p><strong>Interpretacija regresije:</strong> Svaki regresijski koeficijent β_i interpretira se kao: “uz kontrolu svih ostalih varijabli u modelu, povećanje prediktora X_i za jednu jedinicu povezano je s promjenom zavisne varijable za β_i jedinica”. R² (koeficijent determinacije) govori koji postotak varijance rezultata ispita model objašnjava. Adj. R² korigira R² za broj prediktora. Dijagnostički plotovi provjeravaju pretpostavke regresije: linearnost, homoskedastičnost rezidua, normalnost rezidua i utjecaj outliera (Cook-ova udaljenost).</p>
+<p><strong>Interpretacija regresije:</strong> Model objašnjava svega 0.27% varijance rezultata ispita (R² = 0.003), što je praktički zanemariva prediktivna snaga. Statistički značajni prediktori su <code>stresslevel</code> (β = −0.79 — viši stres povezan s nižim rezultatom), <code>assignmentcompletion</code> (β = 0.033) i <code>onlinecourses</code> (β = 0.060), dok <code>studyhours</code>, <code>attendance</code>, <code>motivation</code> i <code>age</code> <strong>nisu statistički značajni</strong>. Dijagnostički “Residuals vs.&nbsp;Fitted” graf pokazuje horizontalnu traku rezidua bez jasnog prediktivnog signala, što je konzistentno s gotovo nultim R².</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Vizualizacija koeficijenata (forest plot)</span></span>
 <span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>koef_vizual <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
@@ -2499,7 +2501,7 @@ Poboljšanje u odnosu na baznu stopu: 3.61 postotnih bodova</code></pre>
 </div>
 </div>
 </div>
-<p><strong>Interpretacija stabla odlučivanja:</strong> Stablo odlučivanja je nelinearan, neparametrijski klasifikacijski model koji podatke dijeli na temelju pragova varijabli. Svaki čvor prikazuje: prediktorsku varijablu i prag podjele, distribuciju klasa (prolaz/pad) i postotak opservacija. Točnost modela uspoređena s baznom stopom (majority class classifier) govori koliko model nadmašuje trivijalno predviđanje. F1 mjera je korisna kada klase nisu izbalansiran jer kombinira preciznost i odziv. Važnost varijabli pokazuje koji prediktori su bili najkorisniji za podjelu podataka.</p>
+<p><strong>Interpretacija stabla odlučivanja:</strong> Model je postigao točnost od 55% u usporedbi s baznom stopom od 51.4% — poboljšanje iznosi tek 3.61 postotnih bodova. Stablo koristi <code>attendance</code> i <code>studyhours</code> kao primarne čvorove podjele, no ta podjela ne rezultira smislenim prediktivnim poboljšanjem. Graf važnosti varijabli pokazuje da su <code>attendance</code>, <code>studyhours</code> i <code>motivation</code> najkorištenije varijable u čvorovima, no unatoč tome model jedva nadmašuje trivijalno predviđanje. Visoka senzitivnost uz nižu specifičnost upućuje na pristranost prema klasi “Prolaz” — odraz nebalansiranosti klasa u datasetu.</p>
 <hr>
 </section>
 </section>
