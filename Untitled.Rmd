@@ -220,6 +220,49 @@ sapply(df, class) |> as.data.frame() |>
   kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
 ```
 
+```{r}
+#| label: relabeling-faktora
+
+# Zamjena numeričkih kodova čitljivim oznakama
+recode_factor <- function(x, mapping) {
+  factor(mapping[as.character(x)], levels = mapping)
+}
+
+if ("gender" %in% names(df))
+  df$gender <- recode_factor(df$gender,
+    c("0" = "Ženski", "1" = "Muški", "2" = "Ostalo"))
+
+if ("learningstyle" %in% names(df))
+  df$learningstyle <- recode_factor(df$learningstyle,
+    c("0" = "Vizualni", "1" = "Auditivni", "2" = "Čitanje/pisanje", "3" = "Kinestetički"))
+
+if ("internet" %in% names(df))
+  df$internet <- recode_factor(df$internet,
+    c("0" = "Ne", "1" = "Da"))
+
+if ("extracurricular" %in% names(df))
+  df$extracurricular <- recode_factor(df$extracurricular,
+    c("0" = "Ne", "1" = "Da"))
+
+if ("discussions" %in% names(df))
+  df$discussions <- recode_factor(df$discussions,
+    c("0" = "Ne", "1" = "Da"))
+
+if ("resources" %in% names(df))
+  df$resources <- recode_factor(df$resources,
+    c("0" = "Nisko", "1" = "Srednje", "2" = "Visoko"))
+
+if ("edutech" %in% names(df))
+  df$edutech <- recode_factor(df$edutech,
+    c("0" = "Ne", "1" = "Da"))
+
+if ("finalgrade" %in% names(df))
+  df$finalgrade <- recode_factor(df$finalgrade,
+    c("0" = "A", "1" = "B", "2" = "C", "3" = "D"))
+
+cat("Relabeling kategorijskih varijabli dovršen.\n")
+```
+
 ## Priprema data.frame-a za analizu
 
 ```{r}
@@ -238,10 +281,9 @@ glimpse(df)
 # Pretpostavljamo da postoje kategorije poput "Pass"/"Fail" ili numeričke ocjene
 
 if ("finalgrade" %in% names(df)) {
-  # FinalGrade je numerički kod: 0=A (najbolja), 1=B, 2=C, 3=D (najlošija)
-  # Prolaz = ocjena A ili B (kod 0 ili 1), Pad = ocjena C ili D (kod 2 ili 3)
-  fg_num <- as.integer(as.character(df$finalgrade))
-  df$prolaz <- factor(ifelse(fg_num <= 1, "Prolaz", "Pad"),
+  # Prolaz = ocjena A ili B, Pad = ocjena C ili D
+  fg_char <- as.character(df$finalgrade)
+  df$prolaz <- factor(ifelse(fg_char %in% c("A", "B"), "Prolaz", "Pad"),
                       levels = c("Pad", "Prolaz"))
   cat("\nDistribucija binarne varijable Prolaz/Pad:\n")
   print(table(df$prolaz))
@@ -398,11 +440,9 @@ if ("learningstyle" %in% names(df_clean)) {
 
 # Gender distribucija
 if ("gender" %in% names(df_clean)) {
-  spol_labele <- c("0" = "Ženski", "1" = "Muški", "2" = "Ostalo")
   p2 <- df_clean |>
     count(gender) |>
-    mutate(spol = spol_labele[as.character(gender)]) |>
-    ggplot(aes(x = spol, y = n, fill = spol)) +
+    ggplot(aes(x = gender, y = n, fill = gender)) +
     geom_bar(stat = "identity", alpha = 0.85, width = 0.5) +
     geom_text(aes(label = n), vjust = -0.3, size = 4) +
     scale_fill_manual(values = c("Ženski" = "#E74C3C", "Muški" = "#3498DB", "Ostalo" = "#2ECC71")) +
