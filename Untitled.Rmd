@@ -347,7 +347,7 @@ df_clean |>
        x = "Vrijednost", y = "Frekvencija")
 ```
 
-**Interpretacija:** Histogrami prikazuju distribuciju svake numeričke varijable. Simetrična, zvonolika distribucija upućuje na normalnost. Vidljivi repovi prema desno ili lijevo indiciraju asimetričnost distribucije što je relevantno za odabir statističkih testova.
+**Interpretacija:** Varijable `studyhours`, `attendance`, `motivation` i `stresslevel` pokazuju gotovo savršeno ravnomjerne (uniformne) distribucije bez ikakve zakošenosti — što je iznimno neuobičajeno za stvarno prikupljene podatke. Varijabla `examscore` blago je pozitivno zakošena (rep prema višim vrijednostima), dok `age` i `assignmentcompletion` pokazuju grublje, diskretne distribucije. Odsutnost zvonoliko oblikovanih distribucija konzistentna je s pretpostavkom o sintetičkoj prirodi dataseta.
 
 ### Box-plotovi i outlieri
 
@@ -371,7 +371,7 @@ df_clean |>
        x = "Varijabla", y = "Vrijednost")
 ```
 
-**Interpretacija:** Box-plot prikazuje medijan (srednja linija), interkvartilni raspon (kutija), raspon bez outliera (brkovi) i outliere (crvene točke). Outlieri su vrijednosti koje se nalaze više od 1.5 puta IQR iznad trećeg ili ispod prvog kvartila. Prisutnost outliera može utjecati na parametrijske testove i regresijske modele.
+**Interpretacija:** Kutije većine varijabli su simetrične s minimalnom razlikom između medijana i kvartila, što potvrđuje uniformnu raspodjelu vidljivu u histogramima. Outlieri (crvene točke) pojavljuju se samo sporadično i ne predstavljaju ozbiljan problem. Varijabla `examscore` ima nešto širi IQR i vidljiviju asimetriju kutije u odnosu na ostale varijable, no i dalje bez izraženih grupacija ekstremnih vrijednosti.
 
 ### Stupčasti dijagrami kategorijskih varijabli
 
@@ -406,8 +406,8 @@ if ("gender" %in% names(df_clean)) {
     scale_fill_manual(values = c("#E74C3C", "#3498DB", "#2ECC71")) +
     theme_minimal(base_size = 12) +
     theme(legend.position = "none") +
-    labs(title = "Distribucija po spolu",
-         x = "Spol", y = "Broj studenata")
+    labs(title = "Distribucija varijable gender (kodiranje 0/1/2)",
+         x = "Kodirana vrijednost", y = "Broj studenata")
   print(p2)
 }
 ```
@@ -473,7 +473,7 @@ corrplot(korel_mat,
          mar = c(0, 0, 2, 0))
 ```
 
-**Interpretacija:** Korelacijska matrica prikazuje Pearsonove koeficijente korelacije između svih parova numeričkih varijabli. Vrijednosti bliže +1 (tamno plava) ukazuju na jaku pozitivnu korelaciju, vrijednosti bliže -1 (tamno crvena) na jaku negativnu korelaciju, a vrijednosti oko 0 na odsutnost linearne veze. Korelacije između prediktorskih varijabli > |0.7| mogu ukazivati na multikolinearnost koja može biti problematična u regresijskim modelima.
+**Interpretacija:** Sve korelacije u matrici iznimno su niske (max |r| ≈ 0.03) — niti jedan par varijabli ne dijeli smislenu linearnu vezu. Korelacija između `studyhours` i `examscore`, koja se u obrazovnoj literaturi redovito nalazi u rasponu r = 0.3–0.6, ovdje je gotovo nulta. Takva univerzalna odsutnost korelacija jedan je od najjasnijih pokazatelja sintetičke prirode dataseta. Multikolinearnost između prediktora nije problem, ali ni prediktivni potencijal varijabli ne postoji.
 
 ## Provjera normalnosti distribucije
 
@@ -497,7 +497,7 @@ for (var in num_vars_clean) {
 par(mfrow = c(1, 1))
 ```
 
-**Interpretacija:** Q-Q (quantile-quantile) plot uspoređuje kvantile distribucije varijable s kvantilima normalne distribucije. Ako točke leže blizu crvene dijagonale, distribucija je normalna. Odstupanja u repovima (S-oblik ili obrnuti S-oblik) ukazuju na asimetričnost ili debelorepe distribucije.
+**Interpretacija:** Niti jedna varijabla ne prati normalnu dijagonalu. Varijable s diskretnim vrijednostima (`age`, `onlinecourses`) pokazuju karakteristični stepeničasti uzorak — točke se grupiraju u horizontalne segmente umjesto da teku kontinuirano uzduž pravca. Varijabla `examscore` ima blago S-odstupanje što ukazuje na lakše repove od normalne distribucije. Sve varijable sustavno odstupaju, konzistentno s uniformnim distribucijama u histogramima.
 
 ### Shapiro-Wilk test normalnosti
 
@@ -535,7 +535,7 @@ normalnost_rezultati |>
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
-**Interpretacija:** Shapiro-Wilk i Anderson-Darling testovi testiraju nultu hipotezu H₀: distribucija je normalna. Ako je p-vrijednost < 0.05, odbacujemo H₀ i zaključujemo da distribucija nije normalna. Napomena: s velikim uzorcima (N > 5.000) ovi testovi postaju izuzetno osjetljivi i odbacuju normalnost čak i pri minimalnim odstupanjima. Zbog toga je vizualna provjera Q-Q plotom ravnopravno važna. Prema Centralnom graničnom teoremu, za velike uzorke (N > 30) parametrijski testovi su robustni i pri umjerenim odstupanjima od normalnosti.
+**Interpretacija:** Oba testa odbacuju H₀ o normalnosti za sve varijable (p < 0.05). Budući da je uzorak velik (N > 12.000), ova osjetljivost je očekivana — i minimalna odstupanja od normalne distribucije dovode do statistički značajnog rezultata. Vizualni uvid iz Q-Q plotova potvrđuje da se distribucije suštinski razlikuju od normalne zbog uniformne raspodjele i diskretnih skokova. Za daljnje parametrijske analize (ANOVA, t-test) oslanjamo se na robustnost uz velik uzorak (Centralni granični teorem).
 
 ---
 
@@ -657,7 +657,7 @@ if (all(c("examscore", "learningstyle") %in% names(df_clean))) {
 }
 ```
 
-**Interpretacija ANOVA:** ANOVA testira jesu li prosječni rezultati ispita jednaki u svim grupama stilova učenja. F-statistika mjeri omjer varijance između grupa i varijance unutar grupa. Visoka F-vrijednost i niska p-vrijednost (< 0.05) ukazuju da razlike između grupa nisu nastale slučajno. Tukey HSD post-hoc test identificira koje specifične parove grupa se statistički značajno razlikuju uz kontrolu greške tipa I.
+**Interpretacija ANOVA:** ANOVA nije detektirala statistički značajnu razliku u rezultatima ispita između stilova učenja (F = `r if(exists("anova_model")) round(summary(anova_model)[[1]][["F value"]][1], 2) else "–"`, p = `r if(exists("anova_model")) format.pval(summary(anova_model)[[1]][["Pr(>F)"]][1], digits = 3, eps = 0.001) else "–"`). Tukey HSD post-hoc test nije pronašao niti jedan statistički značajan par skupina — sve p-vrijednosti parova premašuju α = 0.05. Box-plotovi vizualno potvrđuju gotovo identične distribucije i aritmetičke sredine (crni rombovi) za sve stilove učenja — grupne sredine razlikuju se za manje od jednog boda. **H₀ se ne odbacuje.**
 
 ### Nezavisni t-test: Online tečajevi i rezultat ispita
 
@@ -742,7 +742,7 @@ if ("online_bin" %in% names(df_clean)) {
 }
 ```
 
-**Interpretacija t-testa:** Welch-ov t-test koristi se jer ne pretpostavlja jednake varijance skupina. t-statistika mjeri razliku između aritmetičkih sredina u standardiziranim jedinicama. p-vrijednost < 0.05 znači da je razlika statistički značajna, tj. nije nastala slučajno. Cohenov d mjeri praktičnu važnost razlike: d < 0.2 (zanemariva), 0.2–0.5 (mala), 0.5–0.8 (srednja), > 0.8 (velika veličina učinka).
+**Interpretacija t-testa:** Welch-ov t-test nije pokazao statistički značajnu razliku u rezultatima ispita između dviju skupina (t = `r if(exists("t_test_rez")) round(t_test_rez$statistic, 2) else "–"`, p = `r if(exists("t_test_rez")) format.pval(t_test_rez$p.value, digits = 3, eps = 0.001) else "–"`). Budući da je p > α = 0.05, **H₀ se ne odbacuje**. Cohenov d = `r if(exists("cohen_d")) round(cohen_d, 3) else "–"` indicira zanemarivo malu veličinu učinka — razlika od 1.43 boda između skupina nema praktičnu relevantnost. Violinski prikaz vizualno potvrđuje gotovo identičan oblik i raspodjelu rezultata u obje skupine.
 
 ## 5.2 Kvantifikacija odnosa — Višestruka linearna regresija
 
@@ -807,7 +807,7 @@ plot(model_reg, which = 1:4, col = "#3498DB",
 par(mfrow = c(1, 1))
 ```
 
-**Interpretacija regresije:** Svaki regresijski koeficijent β_i interpretira se kao: "uz kontrolu svih ostalih varijabli u modelu, povećanje prediktora X_i za jednu jedinicu povezano je s promjenom zavisne varijable za β_i jedinica". R² (koeficijent determinacije) govori koji postotak varijance rezultata ispita model objašnjava. Adj. R² korigira R² za broj prediktora. Dijagnostički plotovi provjeravaju pretpostavke regresije: linearnost, homoskedastičnost rezidua, normalnost rezidua i utjecaj outliera (Cook-ova udaljenost).
+**Interpretacija regresije:** Model objašnjava svega `r if(exists("model_reg")) round(summary(model_reg)$r.squared * 100, 2) else "–"`% varijance rezultata ispita (R² = `r if(exists("model_reg")) round(summary(model_reg)$r.squared, 3) else "–"`), što je praktički zanemariva prediktivna snaga. Statistički značajni prediktori su `stresslevel` (β = −0.79 — viši stres povezan s nižim rezultatom), `assignmentcompletion` (β = 0.033) i `onlinecourses` (β = 0.060), dok `studyhours`, `attendance`, `motivation` i `age` **nisu statistički značajni**. Dijagnostički "Residuals vs. Fitted" graf pokazuje horizontalnu traku rezidua bez jasnog prediktivnog signala, što je konzistentno s gotovo nultim R².
 
 ```{r}
 #| label: regresija-vizualizacija
@@ -997,7 +997,7 @@ if (exists("stablo")) {
 }
 ```
 
-**Interpretacija stabla odlučivanja:** Stablo odlučivanja je nelinearan, neparametrijski klasifikacijski model koji podatke dijeli na temelju pragova varijabli. Svaki čvor prikazuje: prediktorsku varijablu i prag podjele, distribuciju klasa (prolaz/pad) i postotak opservacija. Točnost modela uspoređena s baznom stopom (majority class classifier) govori koliko model nadmašuje trivijalno predviđanje. F1 mjera je korisna kada klase nisu izbalansiran jer kombinira preciznost i odziv. Važnost varijabli pokazuje koji prediktori su bili najkorisniji za podjelu podataka.
+**Interpretacija stabla odlučivanja:** Model je postigao točnost od `r if(exists("tocnost")) paste0(round(tocnost * 100, 1), "%") else "–"` u usporedbi s baznom stopom od `r if(exists("bazna_stopa")) paste0(round(bazna_stopa * 100, 1), "%") else "–"` — poboljšanje iznosi tek `r if(exists("tocnost") && exists("bazna_stopa")) paste0(round((tocnost - bazna_stopa) * 100, 2), " postotnih bodova") else "–"`. Stablo koristi `attendance` i `studyhours` kao primarne čvorove podjele, no ta podjela ne rezultira smislenim prediktivnim poboljšanjem. Graf važnosti varijabli pokazuje da su `attendance`, `studyhours` i `motivation` najkorištenije varijable u čvorovima, no unatoč tome model jedva nadmašuje trivijalno predviđanje. Visoka senzitivnost uz nižu specifičnost upućuje na pristranost prema klasi "Prolaz" — odraz nebalansiranosti klasa u datasetu.
 
 ---
 
