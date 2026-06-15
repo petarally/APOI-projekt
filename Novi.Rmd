@@ -1,0 +1,1022 @@
+---
+title: "Prediktori akademske uspješnosti učenika srednje škole"
+subtitle: "Projekt - Analiza podataka i obrada informacija"
+author: "Petar Prenc"
+date: today
+lang: hr
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "Sadržaj"
+    number-sections: true
+    theme: cosmo
+    code-fold: false
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+---
+
+# Uvod
+
+Ovaj projekt istražuje prediktore akademske uspješnosti učenika dviju portugalskih državnih srednjih škola, koristeći dataset koji su prikupili Cortez i Silva (2008.) za predmete matematiku i portugalski jezik. Za razliku od sintetičkih dataseta, ovi su podatci prikupljeni iz stvarnih školskih evidencija i anketnih upitnika, što ih čini pogodnima za izgradnju i evaluaciju prediktivnih modela sa stvarnim analitičkim potencijalom. Cilj je primijeniti komplementarne statističke metode - jednosmjernu ANOVA-u, Welch-ov t-test, višestruku linearnu regresiju i stablo odlučivanja - kako bi se identificirali ključni prediktori završne ocjene (G3) i istražila mogućnost pouzdane klasifikacije ishoda prolaz/pad.
+
+---
+
+# Faza 1: Odabir i dohvat podataka
+
+## Pojmovno, prostorno i vremensko određenje skupa podataka
+
+**Pojmovno određenje:** Statistički skup obuhvaća akademske, demografske i socijalne karakteristike učenika dviju portugalsih sekundarnih škola. Varijable uključuju ocjene iz dvaju polugodišta (G1, G2) i finalnu ocjenu (G3) na skali 0–20, demografska obilježja (dob, spol, adresa), obiteljski kontekst (obrazovanje i zanimanje roditelja, bračni status roditelja, veličina obitelji), navike učenja (tjedno sati učenja, broj prethodnih neuspjeha, izostanci), izvanškolske aktivnosti (izlasci s prijateljima, konzumacija alkohola radnim danom i vikendom, slobodno vrijeme) te pristup resursima (internet kod kuće, plaćene instrukcije, školska i obiteljska potpora).
+
+
+**Prostorno određenje:** Podatci su prikupljeni u akademskoj godini 2005./2006. u dvije srednje škole u regiji Alentejo, Portugal:
+
+- **Gabriel Pereira (GP)** - urbana sredina, veća škola
+- **Mousinho da Silveira (MS)** - ruralna sredina, manja škola
+
+**Vremensko određenje:** Prikupljanje podataka odvijalo se tijekom akademske godine 2005./2006. putem školskih evidencija i anonimnih anketnih upitnika. Dataset je objavljen 2008. u sklopu referentnog rada te dostupan putem UCI Machine Learning Repositoryja od 2014. godine.
+
+**Populacija ili uzorak:** Radi se o **uzorku** - 397 učenika matematike i 651 učenik portugalskog, ukupno 1.048 zapisa. Valja napomenuti da je 382 učenika pohađalo oba predmeta i stoga se pojavljuju u oba dijela dataseta. Populacija su svi učenici portugalsih sekundarnih škola, a nalaze je uz oprez moguće generalizirati na slične europske obrazovne sustave.
+
+## Izvor podataka
+
+Podatci su preuzeti iz arhive radnog direktorija projekta (`archive/`), koji odgovara izvorniku s Kaggle platforme:
+
+- **Naziv dataseta:** Student Performance Data Set
+- **Originalni autori:** Paulo Cortez & Alice Maria Gonçalves Silva, Sveučilište Minho, Portugal
+- **Datoteke:** `archive/Maths.csv` (matematika) i `archive/Portuguese.csv` (portugalski) - Excel format s .csv ekstenzijom
+- **UCI repozitorij:** <https://archive.ics.uci.edu/ml/datasets/student+performance>
+- **Licenca:** Creative Commons Attribution 4.0 International (CC BY 4.0)
+- **Referentni rad:** Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance. *Proceedings of FUBUTEC 2008*, pp. 5–12, EUROSIS.
+
+```{r}
+#| label: ucitavanje-paketa
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(moments)
+library(car)
+library(nortest)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(MASS)
+library(corrplot)
+library(readxl)
+```
+
+```{r}
+#| label: dohvat-podataka
+
+# Datoteke su Excel format (.xlsx) pohranjen s .csv ekstenzijom - koristimo readxl
+df_mat <- read_excel("archive/Maths.csv")
+df_por <- read_excel("archive/Portuguese.csv")
+
+# Dodavanje oznake predmeta
+df_mat$predmet <- "Matematika"
+df_por$predmet <- "Portugalski"
+
+cat("Matematika:   ", nrow(df_mat), "redaka x", ncol(df_mat), "stupaca\n")
+cat("Portugalski:  ", nrow(df_por), "redaka x", ncol(df_por), "stupaca\n")
+cat("\nNazivi varijabli:\n")
+print(names(df_mat))
+```
+
+---
+
+# Faza 2: ETL Proces
+
+## Pregled sirovih podataka
+
+```{r}
+#| label: pregled-sirovih
+
+head(df_mat, 5) |>
+  kable(caption = "Prvih 5 redaka - Matematika (sirovi podatci)") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) |>
+  scroll_box(width = "100%")
+
+str(df_mat)
+```
+
+## Spajanje i čišćenje podataka
+
+### Spajanje skupova podataka
+
+```{r}
+#| label: spajanje
+
+df_raw <- bind_rows(df_mat, df_por)
+
+cat("Ukupan broj zapisa nakon spajanja:", nrow(df_raw), "\n")
+cat("Broj varijabli:", ncol(df_raw), "\n")
+cat("Napomena: 382 učenika pohađa oba predmeta te se pojavljuje\n")
+cat("u oba dijela dataseta, no ne radi se o identičnim recima.\n")
+```
+
+### Standardizacija naziva varijabli
+
+```{r}
+#| label: standardizacija
+
+df <- df_raw
+names(df) <- tolower(gsub("[. ]", "_", names(df)))
+
+cat("Standardizirani nazivi varijabli:\n")
+print(names(df))
+```
+
+### Provjera nedostajućih vrijednosti
+
+```{r}
+#| label: nedostajuce
+
+na_pregled <- df |>
+  summarise(across(everything(), ~sum(is.na(.)))) |>
+  pivot_longer(everything(), names_to = "varijabla", values_to = "broj_NA") |>
+  mutate(postotak_NA = round(broj_NA / nrow(df) * 100, 2))
+
+na_s_vrijednostima <- na_pregled |> filter(broj_NA > 0)
+
+if (nrow(na_s_vrijednostima) > 0) {
+  na_s_vrijednostima |>
+    kable(caption = "Varijable s nedostajućim vrijednostima") |>
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+} else {
+  cat("*Nema varijabli s nedostajućim vrijednostima — dataset je kompletan.*\n")
+}
+
+cat("Ukupno nedostajućih vrijednosti:", sum(is.na(df)), "\n")
+```
+
+### Provjera duplikata
+
+```{r}
+#| label: duplikati
+
+n_dup <- sum(duplicated(df))
+cat("Broj potpuno identičnih redaka:", n_dup, "\n")
+
+if (n_dup > 0) {
+  df <- df[!duplicated(df), ]
+  cat("Uklonjeni duplikati. Novi broj redaka:", nrow(df), "\n")
+} else {
+  cat("Nema potpunih duplikata - podatci su čisti.\n")
+}
+```
+
+## Transformacija i prilagodba tipova varijabli
+
+```{r}
+#| label: transformacija-tipova
+
+# Kategorijske varijable → faktori
+cat_cols <- c("school", "sex", "address", "famsize", "pstatus",
+              "mjob", "fjob", "reason", "guardian",
+              "schoolsup", "famsup", "paid", "activities",
+              "nursery", "higher", "internet", "romantic", "predmet")
+
+cat_cols_exist <- intersect(cat_cols, names(df))
+for (col in cat_cols_exist) df[[col]] <- as.factor(df[[col]])
+
+# Numeričke varijable
+num_cols <- c("age", "medu", "fedu", "traveltime", "studytime",
+              "failures", "famrel", "freetime", "goout",
+              "dalc", "walc", "health", "absences", "g1", "g2", "g3")
+
+num_cols_exist <- intersect(num_cols, names(df))
+for (col in num_cols_exist) df[[col]] <- as.numeric(df[[col]])
+
+cat("Tipovi varijabli nakon transformacije:\n")
+sapply(df, class) |> as.data.frame() |> setNames("Tip") |>
+  kable(caption = "Tipovi varijabli") |>
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+```
+
+## Relabeling i kreiranje deriviranih varijabli
+
+```{r}
+#| label: relabeling
+
+# Čitljive oznake za binarne faktore
+df$sex      <- factor(df$sex,
+  levels = c("F", "M"), labels = c("Ženski", "Muški"))
+df$address  <- factor(df$address,
+  levels = c("R", "U"), labels = c("Ruralno", "Urbano"))
+df$internet <- factor(df$internet,
+  levels = c("no", "yes"), labels = c("Ne", "Da"))
+df$higher   <- factor(df$higher,
+  levels = c("no", "yes"), labels = c("Ne", "Da"))
+df$romantic <- factor(df$romantic,
+  levels = c("no", "yes"), labels = c("Ne", "Da"))
+df$schoolsup <- factor(df$schoolsup,
+  levels = c("no", "yes"), labels = c("Ne", "Da"))
+df$famsup   <- factor(df$famsup,
+  levels = c("no", "yes"), labels = c("Ne", "Da"))
+df$paid     <- factor(df$paid,
+  levels = c("no", "yes"), labels = c("Ne", "Da"))
+df$activities <- factor(df$activities,
+  levels = c("no", "yes"), labels = c("Ne", "Da"))
+df$nursery  <- factor(df$nursery,
+  levels = c("no", "yes"), labels = c("Ne", "Da"))
+df$famsize  <- factor(df$famsize,
+  levels = c("LE3", "GT3"), labels = c("≤3 člana", ">3 člana"))
+df$pstatus  <- factor(df$pstatus,
+  levels = c("A", "T"), labels = c("Odvojeni", "Zajedno"))
+
+# Ordinal etikete za sate učenja (1 = <2h, 2 = 2–5h, 3 = 5–10h, 4 = >10h)
+df$studytime_f <- factor(df$studytime,
+  levels = 1:4,
+  labels = c("<2 sata", "2–5 sati", "5–10 sati", ">10 sati"))
+
+# Ordinal etikete za obrazovanje majke (Medu)
+df$medu_f <- factor(df$medu,
+  levels = 0:4,
+  labels = c("Bez obrazovanja", "Osnovna škola",
+             "Srednja škola (niža)", "Srednja škola (viša)",
+             "Visoko obrazovanje"))
+
+# Binarna ciljna varijabla: G3 >= 10 = Prolaz
+df$prolaz <- factor(ifelse(df$g3 >= 10, "Prolaz", "Pad"),
+                    levels = c("Pad", "Prolaz"))
+
+cat("Distribucija prolaz/pad po predmetu:\n")
+print(table(df$predmet, df$prolaz))
+
+df_clean <- df
+cat("\nFinalni data.frame spreman za analizu:",
+    nrow(df_clean), "redaka x", ncol(df_clean), "stupaca\n")
+```
+
+---
+
+# Faza 3: Eksploracijska analiza podataka (EDA)
+
+## Deskriptivna statistika
+
+### Numeričke varijable
+
+```{r}
+#| label: deskriptivna-stat
+
+deskriptivna_stat <- function(x, naziv) {
+  x_c <- x[!is.na(x)]
+  data.frame(
+    Varijabla     = naziv,
+    N             = length(x_c),
+    Srednja_vr    = round(mean(x_c), 3),
+    Medijan       = round(median(x_c), 3),
+    Std_dev       = round(sd(x_c), 3),
+    Min           = round(min(x_c), 3),
+    Maks          = round(max(x_c), 3),
+    IQR           = round(IQR(x_c), 3),
+    Asimetricnost = round(skewness(x_c), 3),
+    Spljoštenost  = round(kurtosis(x_c), 3)
+  )
+}
+
+num_vars_clean <- names(df_clean)[sapply(df_clean, is.numeric)]
+
+map_dfr(num_vars_clean, function(v) deskriptivna_stat(df_clean[[v]], v)) |>
+  kable(caption = "Deskriptivna statistika numeričkih varijabli", digits = 3) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = TRUE,
+                font_size = 11) |>
+  scroll_box(width = "100%")
+```
+
+**Interpretacija:** U kombiniranom uzorku od 1.044 zapisa (nakon uklanjanja 4 duplikata), prosječna završna ocjena G3 iznosi 11.34 bodova (medijan = 11, SD ≈ 3.87) na skali 0–20. Posebno su zanimljive ocjene G1 i G2 koje su izrazito visoko korelirane s G3 (što potvrđuje konzistentnost evaluacije), te varijabla `failures` (broj prethodnih neuspjeha) koja je pozitivno asimetrična - velika većina učenika nema prethodnih neuspjeha. Varijable poput `dalc`, `walc` i `goout` pokazuju desnu asimetričnost, što je očekivano: tipično je da većina učenika konzumira malo alkohola i manje izlazi. Distribucije odražavaju stvarne obrasce ponašanja učenika.
+
+### Kategorijske varijable
+
+```{r}
+#| label: deskriptivna-kat
+#| results: 'asis'
+
+prikaz_cat <- c("predmet", "sex", "address", "internet",
+                "higher", "studytime_f", "medu_f", "prolaz")
+
+for (var in intersect(prikaz_cat, names(df_clean))) {
+  freq_tab <- table(df_clean[[var]])
+  tablica <- data.frame(
+    Kategorija  = names(freq_tab),
+    Frekvencija = as.numeric(freq_tab),
+    Postotak    = round(prop.table(freq_tab) * 100, 2)
+  )
+  cat(as.character(
+    kable(tablica, caption = paste("Frekvencijska tablica -", var)) |>
+      kable_styling(bootstrap_options = "striped", full_width = FALSE)
+  ))
+  cat("\n")
+}
+```
+
+## Vizualizacija
+
+### Distribucija završnih ocjena (G3) po predmetu
+
+```{r}
+#| label: distribucija-g3
+#| fig-width: 10
+#| fig-height: 5
+
+ggplot(df_clean, aes(x = g3, fill = predmet)) +
+  geom_histogram(bins = 21, color = "white", alpha = 0.85, position = "identity") +
+  facet_wrap(~predmet, ncol = 2) +
+  scale_fill_manual(values = c("Matematika" = "#E74C3C",
+                                "Portugalski" = "#3498DB")) +
+  geom_vline(xintercept = 9.5, linetype = "dashed",
+             color = "grey30", linewidth = 0.8) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none") +
+  labs(title = "Distribucija završnih ocjena (G3) po predmetu",
+       subtitle = "Isprekidana linija označava granicu prolaz/pad (G3 = 10)",
+       x = "Završna ocjena G3 (0–20)", y = "Frekvencija")
+```
+
+**Interpretacija:** Matematika ima izražen vrhunac na vrijednosti 0 i visok udio učenika s niskim ocjenama, što se odražava u nižoj prosječnoj ocjeni (M ≈ 10.38) i stopi prolaza od 66.8%. Portuguesa pokazuje pomaknutiju distribuciju prema višim ocjenama (M ≈ 11.90, stopa prolaza 84.6%). U oba predmeta vidljiv je uzorak karakterističan za stvarne školske podatke: koncentracija u sredini distribucije s repom prema nižim vrijednostima.
+
+### Histogrami ključnih numeričkih varijabli
+
+```{r}
+#| label: histogrami
+#| fig-width: 12
+#| fig-height: 9
+
+kljucne_num <- c("g1", "g2", "g3", "studytime", "failures",
+                  "absences", "goout", "dalc", "walc", "age")
+
+df_clean |>
+  dplyr::select(any_of(kljucne_num)) |>
+  pivot_longer(everything(), names_to = "varijabla", values_to = "vrijednost") |>
+  ggplot(aes(x = vrijednost, fill = varijabla)) +
+  geom_histogram(bins = 20, color = "white", alpha = 0.85) +
+  facet_wrap(~varijabla, scales = "free", ncol = 4) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "none",
+        strip.text = element_text(face = "bold")) +
+  labs(title = "Distribucija ključnih numeričkih varijabli",
+       x = "Vrijednost", y = "Frekvencija")
+```
+
+**Interpretacija:** Ocjene G1, G2 i G3 imaju zvonoliku distribuciju blago asimetričnu prema lijevom repu (negatively skewed) - realističan obrazac za školske ocjene. Varijabla `failures` je izrazito desno asimetrična (većina učenika bez prethodnih neuspjeha). Konzumacija alkohola (`dalc`, `walc`) i `goout` desno su asimetrični - tipično za adolescentske uzorke. Izostanci (`absences`) pokazuju jako desnu asimetričnost s nekoliko ekstremnih slučajeva - realístičan obrazac koji ukazuje na manjinu učenika s visokim stopama izostanaka.
+
+### Box-plotovi G3 po kategorijskim varijablama
+
+```{r}
+#| label: boxplot-predmet
+#| fig-width: 8
+#| fig-height: 5
+
+ggplot(df_clean, aes(x = predmet, y = g3, fill = predmet)) +
+  geom_boxplot(alpha = 0.75, outlier.alpha = 0.4, outlier.size = 1.5) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, color = "black") +
+  scale_fill_manual(values = c("Matematika" = "#E74C3C",
+                                "Portugalski" = "#3498DB")) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none") +
+  labs(title = "Završna ocjena (G3) po predmetu",
+       subtitle = "Crni romb (◆) = aritmetička sredina",
+       x = "Predmet", y = "G3 (0–20)")
+```
+
+```{r}
+#| label: boxplot-spol
+#| fig-width: 8
+#| fig-height: 5
+
+ggplot(df_clean, aes(x = sex, y = g3, fill = sex)) +
+  geom_boxplot(alpha = 0.75, outlier.alpha = 0.4, outlier.size = 1.5) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, color = "black") +
+  scale_fill_manual(values = c("Ženski" = "#E74C3C", "Muški" = "#3498DB")) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none") +
+  labs(title = "Završna ocjena (G3) po spolu",
+       subtitle = "Crni romb (◆) = aritmetička sredina",
+       x = "Spol", y = "G3 (0–20)")
+```
+
+```{r}
+#| label: boxplot-medu
+#| fig-width: 10
+#| fig-height: 5
+
+ggplot(df_clean, aes(x = medu_f, y = g3, fill = medu_f)) +
+  geom_boxplot(alpha = 0.75, outlier.alpha = 0.4, outlier.size = 1.5) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, color = "black") +
+  scale_fill_brewer(palette = "YlOrRd") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 20, hjust = 1)) +
+  labs(title = "Završna ocjena (G3) prema obrazovanju majke",
+       subtitle = "Crni romb (◆) = aritmetička sredina",
+       x = "Obrazovanje majke (Medu)", y = "G3 (0–20)")
+```
+
+### Dijagrami rasipanja: prethodni uspjeh i završna ocjena
+
+```{r}
+#| label: scatter-g1-g3
+#| fig-width: 10
+#| fig-height: 5
+
+ggplot(df_clean, aes(x = g1, y = g3, color = predmet)) +
+  geom_point(alpha = 0.3, size = 1.2) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 1.2) +
+  scale_color_manual(values = c("Matematika" = "#E74C3C",
+                                 "Portugalski" = "#3498DB")) +
+  theme_minimal(base_size = 13) +
+  labs(title = "Odnos ocjene iz 1. polugodišta (G1) i završne ocjene (G3)",
+       subtitle = "Linije = linearni trend po predmetu; sivo = 95% IP",
+       x = "G1 - ocjena iz 1. polugodišta", y = "G3 - završna ocjena",
+       color = "Predmet")
+```
+
+```{r}
+#| label: scatter-failures-g3
+#| fig-width: 9
+#| fig-height: 5
+
+ggplot(df_clean, aes(x = factor(failures), y = g3, fill = factor(failures))) +
+  geom_boxplot(alpha = 0.75, outlier.alpha = 0.4) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 4, color = "black") +
+  scale_fill_brewer(palette = "Reds") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none") +
+  labs(title = "Završna ocjena (G3) prema broju prethodnih neuspjeha",
+       x = "Broj prethodnih neuspjeha (failures)", y = "G3 (0–20)")
+```
+
+### Korelacijska matrica numeričkih varijabli
+
+```{r}
+#| label: korelacijska-matrica
+#| fig-width: 10
+#| fig-height: 9
+
+kljucne_korel <- c("g1", "g2", "g3", "studytime", "failures",
+                    "absences", "goout", "dalc", "walc",
+                    "age", "medu", "fedu", "health")
+
+korel_mat <- df_clean |>
+  dplyr::select(any_of(kljucne_korel)) |>
+  cor(use = "complete.obs")
+
+corrplot(korel_mat,
+         method = "color",
+         type = "upper",
+         order = "hclust",
+         addCoef.col = "black",
+         number.cex = 0.65,
+         tl.cex = 0.9,
+         tl.col = "black",
+         col = colorRampPalette(c("#E74C3C", "white", "#3498DB"))(200),
+         title = "Korelacijska matrica numeričkih varijabli",
+         mar = c(0, 0, 2, 0))
+```
+
+**Interpretacija:** Korelacijska matrica jasno pokazuje smislene odnose koji su karakteristični za stvarne obrazovne podatke. Između G1, G2 i G3 postoje iznimno visoke pozitivne korelacije (r ≈ 0.80–0.90), što potvrđuje konzistentnost ocjenjivanja kroz akademsku godinu. Varijabla `failures` negativno je korelirana s G3 (r ≈ −0.35), što je logično - učenici s više prethodnih neuspjeha tipično imaju niže završne ocjene. Konzumacija alkohola (`dalc`, `walc`) negativno korelira s ocjenama (r ≈ −0.15 do −0.20), a `medu` i `fedu` pozitivno (r ≈ 0.15–0.20). Varijable `goout` i `absences` pokazuju slabiju negativnu korelaciju s G3.
+
+## Provjera normalnosti distribucije
+
+### Q-Q plotovi
+
+```{r}
+#| label: qq-plotovi
+#| fig-width: 12
+#| fig-height: 6
+
+qq_vars <- c("g1", "g2", "g3", "studytime", "failures", "absences")
+
+par(mfrow = c(2, 3), mar = c(4, 4, 3, 1))
+for (var in qq_vars) {
+  x <- df_clean[[var]]
+  x <- x[!is.na(x)]
+  qqnorm(x, main = paste("Q-Q plot:", var),
+         pch = 1, cex = 0.4, col = "#3498DB")
+  qqline(x, col = "#E74C3C", lwd = 2)
+}
+par(mfrow = c(1, 1))
+```
+
+**Interpretacija:** Ocjene G1, G2 i G3 relativno dobro prate normalnu dijagonalu u središnjem dijelu distribucije, no s karakterističnim teže repovima - posebno lijevi rep odražava skupinu učenika s ocjenom 0 (koji su vjerojatno odustali od predmeta). Varijabla `failures` i `absences` značajno odstupaju od normalne distribucije zbog izražene desne asimetričnosti. Za regresijsku analizu oslanjamo se na robustnost uz velik uzorak (Centralni granični teorem) i interpretiramo dijagnostičke plotove reziduala.
+
+### Shapiro-Wilk test normalnosti
+
+```{r}
+#| label: shapiro-wilk
+
+set.seed(42)
+
+normalnost_rez <- map_dfr(qq_vars, function(var) {
+  x <- df_clean[[var]][!is.na(df_clean[[var]])]
+  x_sample <- sample(x, size = min(5000, length(x)))
+  sw  <- shapiro.test(x_sample)
+  adn <- nortest::ad.test(x)
+  data.frame(
+    Varijabla       = var,
+    SW_W            = round(sw$statistic, 4),
+    SW_p            = round(sw$p.value, 4),
+    AD_A            = round(adn$statistic, 4),
+    AD_p            = round(adn$p.value, 4),
+    Normalna        = ifelse(sw$p.value > 0.05, "Da", "Ne")
+  )
+})
+
+normalnost_rez |>
+  kable(caption = "Testovi normalnosti (SW = Shapiro-Wilk; AD = Anderson-Darling)",
+        col.names = c("Varijabla", "SW W", "SW p", "AD A²", "AD p", "Normalna")) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+**Interpretacija:** Oba testa odbacuju H₀ o normalnosti za sve varijable (p < 0.05). Ovo je djelomično posljedica veličine uzorka (N = 1.044) koji amplificira statističku osjetljivost, ali i stvarnih odstupanja (desna asimetričnost `failures` i `absences`, bimodalni uzorak kod `g3`). Za ANOVA-u i t-test oslanjamo se na robustnost uz N > 30 po grupi, a za regresiju analiziramo dijagnostičke plotove reziduala.
+
+---
+
+# Faza 4: Istraživačka pitanja i hipoteze
+
+Na temelju eksploracijske analize, formulirana su sljedeća istraživačka pitanja:
+
+**Pitanje 1:** Postoji li statistički značajna razlika u završnoj ocjeni između učenika koji pohađaju matematiku i učenika koji pohađaju portugalski jezik?
+
+- H₀: Nema razlike u prosječnoj završnoj ocjeni između predmeta (μ_mat = μ_por)
+- H₁: Postoji statistički značajna razlika u prosječnoj završnoj ocjeni između predmeta (μ_mat ≠ μ_por)
+
+**Pitanje 2:** Utječe li razina obrazovanja majke na završnu ocjenu učenika?
+
+- H₀: Ne postoji razlika u prosječnoj završnoj ocjeni između grupa učenika s različitim stupnjem obrazovanja majke (μ₀ = μ₁ = μ₂ = μ₃ = μ₄)
+- H₁: Postoji razlika u prosječnoj završnoj ocjeni između barem dviju skupina s različitim stupnjem obrazovanja majke
+
+**Pitanje 3:** Mogu li ocjene iz 1. i 2. polugodišta, sati učenja, broj prethodnih neuspjeha, izostanci i izlasci predvidjeti završnu ocjenu?
+
+- H₀: Niti jedan prediktor ne doprinosi značajno objašnjenju varijance završne ocjene (β₁ = β₂ = ... = βₖ = 0)
+- H₁: Barem jedan prediktor statistički značajno predviđa završnu ocjenu
+
+**Pitanje 4:** Može li se na temelju dostupnih varijabli klasificirati hoće li učenik položiti (G3 ≥ 10) ili ne?
+
+- H₀: Model klasifikacije ne predviđa prolaz/pad bolje od slučajnog pogađanja (bazna stopa)
+- H₁: Model klasifikacije statistički značajno predviđa prolaz/pad s točnosti > bazna stopa
+
+---
+
+# Faza 5: Modeliranje i interpretacija
+
+## Usporedba skupina - t-test i jednosmjerna ANOVA
+
+### Welch-ov t-test: Razlika u G3 između predmeta
+
+```{r}
+#| label: ttest-predmet-deskrip
+
+df_clean |>
+  group_by(predmet) |>
+  summarise(
+    N       = n(),
+    Srednja = round(mean(g3, na.rm = TRUE), 3),
+    SD      = round(sd(g3, na.rm = TRUE), 3),
+    Medijan = round(median(g3, na.rm = TRUE), 3),
+    Min     = min(g3, na.rm = TRUE),
+    Maks    = max(g3, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  kable(caption = "Deskriptivna statistika G3 po predmetu") |>
+  kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
+```
+
+```{r}
+#| label: ttest-predmet
+
+# Levene test homogenosti varijanci
+levene_pred <- car::leveneTest(g3 ~ predmet, data = df_clean)
+cat("=== Levene test (homogenost varijanci) ===\n")
+print(levene_pred)
+
+# Welch-ov t-test (ne pretpostavlja jednake varijance)
+t_pred <- t.test(g3 ~ predmet, data = df_clean, var.equal = FALSE)
+cat("\n=== Welch-ov nezavisni t-test ===\n")
+print(t_pred)
+
+# Cohenov d
+grupe_pred <- split(df_clean$g3, df_clean$predmet)
+m1 <- mean(grupe_pred[[1]], na.rm = TRUE)
+m2 <- mean(grupe_pred[[2]], na.rm = TRUE)
+s1 <- sd(grupe_pred[[1]], na.rm = TRUE)
+s2 <- sd(grupe_pred[[2]], na.rm = TRUE)
+n1 <- sum(!is.na(grupe_pred[[1]]))
+n2 <- sum(!is.na(grupe_pred[[2]]))
+pooled_sd_pred <- sqrt(((n1 - 1)*s1^2 + (n2 - 1)*s2^2) / (n1 + n2 - 2))
+cohen_d_pred   <- abs(m1 - m2) / pooled_sd_pred
+
+cat("\n=== Veličina učinka ===\n")
+cat("Cohenov d =", round(cohen_d_pred, 3), "\n")
+cat("Interpretacija:",
+  ifelse(cohen_d_pred < 0.2, "zanemariva",
+  ifelse(cohen_d_pred < 0.5, "mala",
+  ifelse(cohen_d_pred < 0.8, "srednja", "velika"))),
+  "veličina učinka\n")
+```
+
+```{r}
+#| label: ttest-vizualizacija
+#| fig-width: 8
+#| fig-height: 5
+
+ggplot(df_clean, aes(x = predmet, y = g3, fill = predmet)) +
+  geom_violin(alpha = 0.55, trim = FALSE) +
+  geom_boxplot(width = 0.15, alpha = 0.9, outlier.alpha = 0.4) +
+  stat_summary(fun = mean, geom = "point",
+               shape = 18, size = 4, color = "black") +
+  scale_fill_manual(values = c("Matematika" = "#E74C3C",
+                                "Portugalski" = "#3498DB")) +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "none") +
+  labs(title = "Distribucija G3 po predmetu",
+       subtitle = "Violinski prikaz + box-plot; ◆ = aritmetička sredina",
+       x = "Predmet", y = "Završna ocjena G3 (0–20)")
+```
+
+**Interpretacija t-testa:** Welch-ov t-test otkrio je statistički značajnu razliku u prosječnim završnim ocjenama između matematike (M = `r round(mean(df_clean$g3[df_clean$predmet == "Matematika"], na.rm=TRUE), 2)`) i portugalskog (M = `r round(mean(df_clean$g3[df_clean$predmet == "Portugalski"], na.rm=TRUE), 2)`) (t = `r if(exists("t_pred")) round(t_pred$statistic, 2) else "–"`, df = `r if(exists("t_pred")) round(t_pred$parameter, 0) else "–"`, p = `r if(exists("t_pred")) format.pval(t_pred$p.value, digits = 3, eps = 0.001) else "–"`). Budući da je p < 0.05, **H₀ se odbacuje** - postoji statistički značajna razlika između predmeta. Cohenov d = `r round(cohen_d_pred, 3)` indicira `r ifelse(cohen_d_pred < 0.2, "zanemarivo malu", ifelse(cohen_d_pred < 0.5, "malu", ifelse(cohen_d_pred < 0.8, "srednju", "veliku")))` veličinu učinka. Violinski prikaz potvrđuje da matematika ima veći udio učenika s ocjenom 0 (vidljivi donji rep), dok je distribucija za portugalski koncentranija oko viših vrijednosti.
+
+---
+
+### Jednosmjerna ANOVA: Utjecaj obrazovanja majke na G3
+
+```{r}
+#| label: anova-medu-deskrip
+
+df_clean |>
+  group_by(medu_f) |>
+  summarise(
+    N       = n(),
+    Srednja = round(mean(g3, na.rm = TRUE), 3),
+    SD      = round(sd(g3, na.rm = TRUE), 3),
+    Medijan = round(median(g3, na.rm = TRUE), 3),
+    .groups = "drop"
+  ) |>
+  arrange(medu_f) |>
+  kable(caption = "Deskriptivna statistika G3 prema obrazovanju majke") |>
+  kable_styling(bootstrap_options = c("striped"), full_width = FALSE)
+```
+
+```{r}
+#| label: anova-medu-pretpostavke
+
+# Levene test homogenosti varijanci
+levene_medu <- car::leveneTest(g3 ~ medu_f, data = df_clean)
+cat("=== Levene test (homogenost varijanci) ===\n")
+print(levene_medu)
+
+if (levene_medu$`Pr(>F)`[1] > 0.05) {
+  cat("\nZaključak: p > 0.05 → Varijance su homogene. Koristimo standardnu ANOVA-u.\n")
+} else {
+  cat("\nZaključak: p < 0.05 → Varijance nisu homogene. Koristimo Welch-ANOVA-u.\n")
+}
+```
+
+```{r}
+#| label: anova-medu-test
+
+# Jednosmjerna ANOVA
+anova_medu <- aov(g3 ~ medu_f, data = df_clean)
+cat("=== Jednosmjerna ANOVA ===\n")
+print(summary(anova_medu))
+
+# Welch-ANOVA (robustna alternativa)
+welch_medu <- oneway.test(g3 ~ medu_f, data = df_clean, var.equal = FALSE)
+cat("\n=== Welch-ANOVA (robustna) ===\n")
+print(welch_medu)
+
+# Post-hoc: Tukey HSD
+cat("\n=== Post-hoc test: Tukey HSD ===\n")
+tukey_medu <- TukeyHSD(anova_medu)
+print(tukey_medu)
+```
+
+```{r}
+#| label: anova-vizualizacija
+#| fig-width: 10
+#| fig-height: 5
+
+ggplot(df_clean, aes(x = medu_f, y = g3, fill = medu_f)) +
+  geom_boxplot(alpha = 0.75, outlier.alpha = 0.4, outlier.size = 1.2) +
+  stat_summary(fun = mean, geom = "point",
+               shape = 18, size = 4, color = "black") +
+  scale_fill_brewer(palette = "YlOrRd") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 20, hjust = 1)) +
+  labs(title = "Distribucija G3 prema obrazovanju majke (Medu)",
+       subtitle = "Crni romb (◆) = aritmetička sredina; rastuće kategorije desno",
+       x = "Obrazovanje majke", y = "Završna ocjena G3 (0–20)")
+```
+
+**Interpretacija ANOVA:** ANOVA je detektirala statistički značajnu razliku u završnoj ocjeni između učenika s različitim razinama obrazovanja majke (F(`r summary(anova_medu)[[1]][["Df"]][1]`, `r summary(anova_medu)[[1]][["Df"]][2]`) = `r round(summary(anova_medu)[[1]][["F value"]][1], 2)`, p = `r format.pval(summary(anova_medu)[[1]][["Pr(>F)"]][1], digits = 3, eps = 0.001)`). Welch-ANOVA potvrđuje isti zaključak (p = `r format.pval(welch_medu$p.value, digits = 3, eps = 0.001)`). **H₀ se odbacuje.** Tukey HSD post-hoc test identificira statistički značajne razlike između sljedećih parova: Visoko obrazovanje – Osnovna škola (p ≈ 0), Visoko obrazovanje – Srednja škola (niža) (p = 0.0000082), Visoko obrazovanje – Srednja škola (viša) (p = 0.001) te Srednja škola (viša) – Osnovna škola (p = 0.026). Skupina "Bez obrazovanja" (n = 9) ne razlikuje se statistički značajno ni od jedne druge skupine (p > 0.56 za sve usporedbe), vjerojatno zbog malog uzorka. Vidljiv je opći trend rasta prosječne ocjene s rastom obrazovnog stupnja majke — učenici čije majke imaju visoko obrazovanje postižu prosječno više ocjene, što je konzistentno s literaturom o utjecaju socioekonomskog statusa na akademski uspjeh.
+
+---
+
+## Kvantifikacija odnosa - Višestruka linearna regresija
+
+```{r}
+#| label: regresija
+
+# Prediktori: G1, G2 (prethodni uspjeh), studytime, failures, absences,
+#             goout, dalc, predmet (faktor)
+prediktori <- intersect(
+  c("g1", "g2", "studytime", "failures", "absences",
+    "goout", "dalc", "predmet"),
+  names(df_clean)
+)
+
+formula_reg <- as.formula(paste("g3 ~", paste(prediktori, collapse = " + ")))
+
+model_reg <- lm(formula_reg, data = df_clean)
+
+cat("=== Višestruka linearna regresija ===\n")
+print(summary(model_reg))
+```
+
+```{r}
+#| label: regresija-koeficijenti
+
+koef_df <- as.data.frame(confint(model_reg))
+koef_df$Procjena     <- coef(model_reg)
+koef_df$t_vrijednost <- summary(model_reg)$coefficients[, "t value"]
+koef_df$p_vrijednost <- summary(model_reg)$coefficients[, "Pr(>|t|)"]
+koef_df$Znacajnost   <- ifelse(koef_df$p_vrijednost < 0.001, "***",
+                        ifelse(koef_df$p_vrijednost < 0.01,  "**",
+                        ifelse(koef_df$p_vrijednost < 0.05,  "*",
+                        ifelse(koef_df$p_vrijednost < 0.1,   ".", ""))))
+
+koef_df |>
+  mutate(across(where(is.numeric), \(x) round(x, 4))) |>
+  kable(caption = "Regresijski koeficijenti s 95% intervalima pouzdanosti",
+        col.names = c("2.5%", "97.5%", "Procjena (β)", "t", "p", "Značajnost")) |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+r2   <- summary(model_reg)$r.squared
+adj_r2 <- summary(model_reg)$adj.r.squared
+f_stat <- summary(model_reg)$fstatistic
+
+cat("\nR²       =", round(r2, 4), "\n")
+cat("Adj. R²  =", round(adj_r2, 4), "\n")
+cat("F-statistika:", round(f_stat[1], 2),
+    "| df =", f_stat[2], "/", f_stat[3],
+    "| p =", format.pval(pf(f_stat[1], f_stat[2], f_stat[3], lower.tail = FALSE),
+                         digits = 4), "\n")
+```
+
+```{r}
+#| label: regresija-dijagnostika
+#| fig-width: 11
+#| fig-height: 9
+
+par(mfrow = c(2, 2), mar = c(4, 4, 3, 1))
+plot(model_reg, which = 1:4, col = "#3498DB", pch = 16, cex = 0.4)
+par(mfrow = c(1, 1))
+```
+
+```{r}
+#| label: regresija-vizualizacija
+#| fig-width: 9
+#| fig-height: 5
+
+koef_vizual <- data.frame(
+  Varijabla = names(coef(model_reg))[-1],
+  Procjena  = coef(model_reg)[-1],
+  CI_low    = confint(model_reg)[-1, 1],
+  CI_high   = confint(model_reg)[-1, 2],
+  Znacajno  = summary(model_reg)$coefficients[-1, "Pr(>|t|)"] < 0.05
+)
+
+ggplot(koef_vizual, aes(x = reorder(Varijabla, Procjena),
+                         y = Procjena, color = Znacajno)) +
+  geom_point(size = 4) +
+  geom_errorbar(aes(ymin = CI_low, ymax = CI_high),
+                width = 0.25, linewidth = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  coord_flip() +
+  scale_color_manual(values = c("grey60", "#E74C3C"),
+                     labels = c("Nije značajno (p ≥ 0.05)", "Značajno (p < 0.05)")) +
+  theme_minimal(base_size = 13) +
+  labs(title = "Regresijski koeficijenti s 95% intervalima pouzdanosti",
+       subtitle = "Crvene točke = statistički značajni prediktori",
+       x = "Prediktor", y = "Procjena koeficijenta (β)",
+       color = "Značajnost")
+```
+
+**Interpretacija regresije:** Model objašnjava `r round(r2 * 100, 1)`% varijance završne ocjene G3 (R² = `r round(r2, 3)`, adj. R² = `r round(adj_r2, 3)`), što je iznimno visoka prediktivna snaga i odraz stvarnih, smislenih odnosa u podatcima. Dominantni prediktori su **G2** (β = `r round(coef(model_reg)["g2"], 3)`, p < 0.001) i **G1** (β = `r round(coef(model_reg)["g1"], 3)`, p < 0.001) - prethodne ocjene su daleko najjači prediktori završne ocjene. Varijabla **failures** (β = −0.237, p < 0.01) negativno predviđa završnu ocjenu — učenici s više prethodnih neuspjeha postižu niže završne ocjene, neovisno o tekućem uspjehu. Varijabla **absences** pokazuje pozitivan koeficijent (β = 0.034, p < 0.001), što je naizgled kontraintuitivno: ovaj supresijski efekt nastaje jer, kada se kontrolira za G1 i G2, izostanci postaju marker specifičnog ponašanja učenika koji prolaze usprkos izostancima te neovisno ne smanjuju G3 u modelu. Predmet (Portugalski vs. Matematika) statistički je značajan prediktor — kontrolirajući za sve ostale faktore, učenici portugalskog imaju prosječno više ocjene. Dijagnostički plotovi pokazuju relativno homogene rezidue bez jasnih uzoraka, što upućuje na adekvatnost pretpostavki linearnog modela. **H₀ se odbacuje** - višestruki prediktori statistički značajno objašnjavaju varijabilitet G3.
+
+---
+
+## Klasifikacija - Stablo odlučivanja
+
+```{r}
+#| label: klasifikacija-priprema
+
+set.seed(42)
+n_obs    <- nrow(df_clean)
+train_idx <- sample(1:n_obs, size = floor(0.7 * n_obs))
+train_df  <- df_clean[train_idx, ]
+test_df   <- df_clean[-train_idx, ]
+
+cat("Trening skup:", nrow(train_df), "opservacija\n")
+cat("Test skup:   ", nrow(test_df), "opservacija\n")
+cat("\nDistribucija prolaz/pad u trening skupu:\n")
+print(round(prop.table(table(train_df$prolaz)) * 100, 1))
+```
+
+```{r}
+#| label: stablo-izgradnja
+
+pred_klas <- intersect(
+  c("g1", "g2", "studytime", "failures", "absences",
+    "goout", "dalc", "walc", "age", "sex", "address",
+    "internet", "higher", "medu", "fedu", "predmet"),
+  names(df_clean)
+)
+
+formula_klas <- as.formula(paste("prolaz ~", paste(pred_klas, collapse = " + ")))
+
+stablo <- rpart(formula_klas,
+                data = train_df,
+                method = "class",
+                control = rpart.control(
+                  minsplit  = 15,
+                  minbucket = 5,
+                  cp        = 0.001,
+                  maxdepth  = 5
+                ))
+
+cat("=== Stablo odlučivanja - sažetak (cp tablica) ===\n")
+printcp(stablo)
+```
+
+```{r}
+#| label: stablo-prikaz
+#| fig-width: 14
+#| fig-height: 7
+
+rpart.plot(stablo,
+           type    = 4,
+           extra   = 104,
+           box.palette = list("Pad" = "#E74C3C", "Prolaz" = "#2ECC71"),
+           shadow.col  = "grey80",
+           nn   = TRUE,
+           main = "Stablo odlučivanja - Klasifikacija prolaz/pad",
+           cex  = 0.75)
+```
+
+```{r}
+#| label: stablo-evaluacija
+
+pred_klase <- predict(stablo, newdata = test_df, type = "class")
+
+conf_mat <- table(Stvarno = test_df$prolaz, Predviđeno = pred_klase)
+cat("=== Konfuzijska matrica ===\n")
+print(conf_mat)
+
+TP <- conf_mat["Prolaz", "Prolaz"]
+TN <- conf_mat["Pad",    "Pad"]
+FP <- conf_mat["Pad",    "Prolaz"]
+FN <- conf_mat["Prolaz", "Pad"]
+
+tocnost     <- (TP + TN) / sum(conf_mat)
+preciznost  <- TP / (TP + FP)
+odziv       <- TP / (TP + FN)
+f1_score    <- 2 * preciznost * odziv / (preciznost + odziv)
+specificnost <- TN / (TN + FP)
+
+data.frame(
+  Metrika    = c("Točnost", "Preciznost", "Odziv (Senzitivnost)",
+                 "Specifičnost", "F1 mjera"),
+  Vrijednost = round(c(tocnost, preciznost, odziv, specificnost, f1_score), 4),
+  Opis = c(
+    "Udio ispravno klasificiranih opservacija",
+    "Udio stvarnih prolaza među predviđenim prolazima",
+    "Udio ispravno identificiranih prolaza",
+    "Udio ispravno identificiranih padova",
+    "Harmonijska sredina preciznosti i odziva"
+  )
+) |>
+  kable(caption = "Metrike evaluacije modela stabla odlučivanja") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+bazna_stopa <- max(prop.table(table(test_df$prolaz)))
+cat("\nBazna stopa (majority class):", round(bazna_stopa * 100, 2), "%\n")
+cat("Točnost modela:               ", round(tocnost * 100, 2), "%\n")
+cat("Poboljšanje nad baznom stopom: +",
+    round((tocnost - bazna_stopa) * 100, 2), "postotnih bodova\n")
+```
+
+```{r}
+#| label: varijable-vaznost
+#| fig-width: 9
+#| fig-height: 5
+
+vaznost <- stablo$variable.importance
+
+if (!is.null(vaznost)) {
+  df_vaznost <- data.frame(
+    Varijabla   = names(vaznost),
+    Vaznost     = as.numeric(vaznost)
+  ) |>
+    arrange(desc(Vaznost)) |>
+    mutate(Vaznost_norm = round(Vaznost / max(Vaznost) * 100, 2))
+
+  df_vaznost |>
+    kable(caption = "Relativna važnost varijabli u modelu stabla odlučivanja") |>
+    kable_styling(bootstrap_options = "striped", full_width = FALSE)
+
+  ggplot(df_vaznost, aes(x = reorder(Varijabla, Vaznost_norm),
+                          y = Vaznost_norm, fill = Vaznost_norm)) +
+    geom_bar(stat = "identity", alpha = 0.85) +
+    geom_text(aes(label = paste0(Vaznost_norm, "%")),
+              hjust = -0.1, size = 3.5) +
+    coord_flip() +
+    scale_fill_gradient(low = "#AED6F1", high = "#1A5276") +
+    theme_minimal(base_size = 13) +
+    theme(legend.position = "none") +
+    ylim(0, 115) +
+    labs(title = "Relativna važnost varijabli - stablo odlučivanja",
+         x = "Varijabla", y = "Relativna važnost (%)")
+}
+```
+
+**Interpretacija stabla odlučivanja:** Model je postigao točnost od `r paste0(round(tocnost * 100, 1), "%")` u usporedbi s baznom stopom od `r paste0(round(bazna_stopa * 100, 1), "%")` - poboljšanje od `r paste0(round((tocnost - bazna_stopa) * 100, 2), " postotnih bodova")`. **H₀ se odbacuje** - model statistički značajno nadmašuje trivijalno predviđanje, a poboljšanje je supstancijalno i praktički relevantno. Dominantne varijable u stablu su G2 i G1 (prethodni uspjeh) koji su gotovo savršeni prediktori prolaza — učenik koji je u prvim dvama polugodištima postigao prolazne ocjene s visokom vjerojatnošću prolazi i završni ispit. Varijable koje se stvarno koriste u čvorovima stabla su G2, G1, predmet i dob (`age`) — varijabla `failures` ne pojavljuje se kao čvor u stablu, ali ima visok rang u ljestvici važnosti varijabli. Graf važnosti varijabli potvrđuje da su G2 i G1 daleko najinformativnije varijable za klasifikaciju.
+
+---
+
+# Faza 6: Sinteza i zaključci
+
+## Sažetak rezultata
+
+### Istraživačko pitanje 1: Razlika između predmeta (t-test)
+
+Welch-ov nezavisni t-test pokazao je statistički značajnu razliku u završnoj ocjeni između matematike (M = `r round(mean(df_clean$g3[df_clean$predmet == "Matematika"], na.rm=TRUE), 2)`) i portugalskog (M = `r round(mean(df_clean$g3[df_clean$predmet == "Portugalski"], na.rm=TRUE), 2)`) (t = `r round(t_pred$statistic, 2)`, p = `r format.pval(t_pred$p.value, digits = 3, eps = 0.001)`). **H₀ se odbacuje.** Cohenov d = `r round(cohen_d_pred, 3)` ukazuje na `r ifelse(cohen_d_pred < 0.2, "zanemarivo malu", ifelse(cohen_d_pred < 0.5, "malu", ifelse(cohen_d_pred < 0.8, "srednju", "veliku")))` veličinu učinka. Razlika je statistički i praktički značajna: stopa prolaza u matematici (66.8%) bitno je niža nego u portugalskom (84.6%).
+
+### Istraživačko pitanje 2: Utjecaj obrazovanja majke (ANOVA)
+
+Jednosmjerna ANOVA pokazala je statistički značajnu razliku u G3 između skupina s različitim razinama obrazovanja majke (F(`r summary(anova_medu)[[1]][["Df"]][1]`, `r summary(anova_medu)[[1]][["Df"]][2]`) = `r round(summary(anova_medu)[[1]][["F value"]][1], 2)`, p = `r format.pval(summary(anova_medu)[[1]][["Pr(>F)"]][1], digits = 3, eps = 0.001)`). **H₀ se odbacuje.** Tukey HSD post-hoc test identificira statistički značajne razlike između sljedećih parova: Visoko obrazovanje – Osnovna škola (p ≈ 0), Visoko obrazovanje – Srednja škola (niža) (p = 0.0000082), Visoko obrazovanje – Srednja škola (viša) (p = 0.001) te Srednja škola (viša) – Osnovna škola (p = 0.026). Skupina "Bez obrazovanja" ne razlikuje se statistički značajno ni od jedne druge skupine (n = 9). Ovaj nalaz konzistentan je s opsežnom literaturom o intergeneracijskom prijenosu obrazovnog kapitala.
+
+### Istraživačko pitanje 3: Prediktori završne ocjene (regresija)
+
+Višestruka linearna regresija s prediktorima G1, G2, studytime, failures, absences, goout, dalc i predmet objasnila je `r round(r2 * 100, 1)`% varijance završne ocjene (R² = `r round(r2, 3)`, adj. R² = `r round(adj_r2, 3)`). **H₀ se odbacuje** - višestruki prediktori statistički su i praktički značajni. Dominantni prediktori su G2 i G1 (prethodni uspjeh iz polugodišta), a `failures` negativno doprinosi predikciji. Predmet (Portugalski) statistički je značajan čak i kontrolirajući za prethodni uspjeh. Model ima stvarnu prediktivnu vrijednost. Dijagnostički plotovi ne ukazuju na ozbiljna kršenja pretpostavki linearnosti i homoskedastičnosti.
+
+### Istraživačko pitanje 4: Klasifikacija prolaz/pad (stablo odlučivanja)
+
+Model stabla odlučivanja postigao je točnost od `r paste0(round(tocnost * 100, 1), "%")` u odnosu na baznu stopu od `r paste0(round(bazna_stopa * 100, 1), "%")` - poboljšanje od `r paste0(round((tocnost - bazna_stopa) * 100, 2), " postotnih bodova")`. **H₀ se odbacuje** - model statistički i praktički značajno nadmašuje trivijalno predviđanje. Visoka točnost odražava snažan signal koji G1 i G2 nose za predviđanje G3. Model ima praktičnu primjenu u ranom otkrivanju učenika s rizikom pada: identifikacija na temelju prvog ili drugog polugodišnog uspjeha omogućuje pravovremenu intervenciju.
+
+## Ograničenja istraživanja
+
+1. **Geografski i vremenski kontekst:** Dataset potječe iz dviju škola u regiji Alentejo, Portugal, u akademskoj godini 2005./2006. Generalizacija na suvremene obrazovne sustave i različite geografske kontekste zahtijeva oprez.
+
+2. **Preklapanje učenika:** 382 učenika pohađa oba predmeta i pojavljuje se u oba dijela dataseta, što uvodi određenu pseudoreplikaciju u kombinirane analize.
+
+3. **Samoizvještajne mjere:** Varijable poput `studytime`, `goout`, `dalc` i `walc` temelje se na samoizvještaju učenika, što je podložno pristranosti socijalne poželjnosti.
+
+4. **Korelacija vs. uzročnost:** Sve identificirane veze su korelacijske - statistički značajni prediktori ne impliciraju nužno uzročno-posljedični odnos s G3.
+
+5. **Informacijska vrijednost G1 i G2:** Visoka prediktivnost G1 i G2 za G3 dijelom odražava konzistentnost ocjenjivanja istog nastavnika kroz godinu, a ne nužno samo stvarni napredak učenika.
+
+6. **Veličina uzorka:** S N = 1.044, statistička snaga je zadovoljavajuća, ali smanjena u usporedbi s dataseti koji obuhvaćaju tisuće učenika.
+
+## Zaključak
+
+Ovo istraživanje analiziralo je akademsku uspješnost 1.044 učeničkih zapisa iz dviju portugalsih sekundarnih škola kroz četiri komplementarne metode - Welch-ov t-test, jednosmjernu ANOVA-u, višestruku linearnu regresiju i stablo odlučivanja - s ciljem identifikacije ključnih prediktora završne ocjene G3 i procjene mogućnosti klasifikacije ishoda prolaz/pad.
+
+**1. Predmet statistički značajno utječe na završnu ocjenu - H₀ se odbacuje.**
+Učenici portugalskog postižu prosječno više ocjene od učenika matematike (razlika ≈ 1.52 boda, Cohenov d = `r round(cohen_d_pred, 3)`). Matematika je strukturno zahtjevnija ili teže ocjenjivana u ovom kontekstu, s gotovo trećinom učenika koji ne prolaze (33.2%).
+
+**2. Obrazovanje majke statistički značajno utječe na završnu ocjenu - H₀ se odbacuje.**
+Vidljiv je opći trend rasta ocjena s obrazovnim stupnjem majke. Tukey HSD statistički značajne razlike identificira između parova: Visoko obrazovanje – Osnovna škola (p ≈ 0), Visoko obrazovanje – Srednja škola (niža) (p < 0.001), Visoko obrazovanje – Srednja škola (viša) (p = 0.001) te Srednja škola (viša) – Osnovna škola (p = 0.026). Ovaj nalaz konzistentan je s teorijom kulturnog i obrazovnog kapitala (Bourdieu, 1986) i empirijskim istraživanjima intergeneracijskog prijenosa obrazovnog statusa.
+
+**3. Višestruka regresija s prethodnim ocjenama objašnjava gotovo svu varijancu G3 - H₀ se odbacuje.**
+Model s G1, G2 i sekundarnim prediktorima objašnjava `r round(r2 * 100, 1)`% varijance G3 (R² = `r round(r2, 3)`). Prethodni uspjeh je daleko najjači prediktor budućeg uspjeha. Nakon kontrole za G1 i G2, broj prethodnih neuspjeha (`failures`) ostaje statistički značajan negativan prediktor, što implicira da akumulirano akademsko iskustvo nosi informaciju neovisno o tekućim ocjenama.
+
+**4. Model klasifikacije pouzdano identificira učenike u riziku - H₀ se odbacuje.**
+Stablo odlučivanja postiglo je točnost od `r paste0(round(tocnost * 100, 1), "%")` (+`r paste0(round((tocnost - bazna_stopa) * 100, 2), " pp")` nad baznom stopom). Model ima jasnu primjenjivu vrijednost: rano identificiranje učenika s rizikom pada na temelju prvog polugodišnog uspjeha omogućuje ciljanu pedagošku intervenciju prije završnog ispita.
+
+Sveukupno, nalazi su konzistentni s literaturom: prethodni akademski uspjeh je najsnažniji prediktor budućeg uspjeha, razlike između predmeta odražavaju stvarne strukturne razlike u težini ili ocjenjivanju, a socioekonomski kontekst (obrazovanje majke) igra statistički mjerljivu ulogu. Sve analize daju smislene i konzistentne rezultate, što potvrđuje da se radi o stvarnim, kvalitetnim obrazovnim podatcima.
+
+---
+
+## Reference
+
+- Cortez, P. & Silva, A. (2008). Using Data Mining to Predict Secondary School Student Performance. *Proceedings of FUBUTEC 2008*, pp. 5–12. EUROSIS.
+- UCI Machine Learning Repository. *Student Performance Data Set*. <https://archive.ics.uci.edu/ml/datasets/student+performance>
+- R Core Team (2024). *R: A language and environment for statistical computing*. Vienna: R Foundation for Statistical Computing.
+- Wickham, H. et al. (2019). Welcome to the tidyverse. *Journal of Open Source Software*, 4(43), 1686.
+- Wickham, H. & Bryan, J. (2023). *readxl: Read Excel Files*. R package version 1.4.3.
+- Cohen, J. (1988). *Statistical Power Analysis for the Behavioral Sciences* (2nd ed.). Erlbaum.
+- Bourdieu, P. (1986). The Forms of Capital. In J. Richardson (Ed.), *Handbook of Theory and Research for the Sociology of Education*. Greenwood.
+
+---
+
+*Projekt izrađen u programskom jeziku R koristeći Quarto dokument format.*
+*Podatci su preuzeti iz archive/ poddirektorija projekta (Excel format, Cortez & Silva, 2008).*
