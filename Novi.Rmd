@@ -738,7 +738,9 @@ formula_reg <- as.formula(paste("g3 ~", paste(prediktori, collapse = " + ")))
 model_reg <- lm(formula_reg, data = df_clean)
 
 cat("=== Višestruka linearna regresija ===\n")
-print(summary(model_reg))
+s <- summary(model_reg)
+cat("Koeficijenti (bez p-vrijednosti):\n")
+print(round(coef(s)[, c("Estimate", "Std. Error", "t value")], 4))
 ```
 
 ```{r}
@@ -988,7 +990,7 @@ Model s G1, G2 i sekundarnim prediktorima formalno postiže R² = `r round(r2, 3
 **4. Model klasifikacije pouzdano identificira učenike u riziku - H₀ se odbacuje.**
 Stablo odlučivanja postiglo je točnost od `r paste0(round(tocnost * 100, 1), "%")` (+`r paste0(round((tocnost - bazna_stopa) * 100, 2), " pp")` nad baznom stopom). Model ima jasnu primjenjivu vrijednost: rano identificiranje učenika s rizikom pada na temelju prvog polugodišnog uspjeha omogućuje ciljanu pedagošku intervenciju prije završnog ispita.
 
-Sveukupno, nalazi su konzistentni s literaturom: prethodni akademski uspjeh je najsnažniji prediktor budućeg uspjeha, razlike između predmeta odražavaju stvarne strukturne razlike u težini ili ocjenjivanju, a socioekonomski kontekst (obrazovanje majke) igra statistički mjerljivu ulogu. Sve analize daju smislene i konzistentne rezultate, što potvrđuje da se radi o stvarnim, kvalitetnim obrazovnim podatcima.
+Sveukupno, nalazi t-testa, ANOVA-e i stabla odlučivanja konzistentni su s literaturom: razlike između predmeta odražavaju stvarne strukturne razlike u težini ili ocjenjivanju, a socioekonomski kontekst (obrazovanje majke) igra statistički mjerljivu ulogu. Višestruka linearna regresija nije dala analitički valjane rezultate zbog metodološkog problema tautologije prediktora, te njeni rezultati ne mogu biti dijelom smislenih zaključaka.
 
 ---
 
