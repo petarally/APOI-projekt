@@ -12,6 +12,7 @@ format:
     number-sections: true
     theme: cosmo
     code-fold: false
+    embed-resources: true
 execute:
   echo: true
   eval: true
