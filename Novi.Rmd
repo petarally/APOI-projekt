@@ -535,7 +535,7 @@ normalnost_rez |>
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 ```
 
-**Interpretacija:** Oba testa odbacuju H₀ o normalnosti za sve varijable (p < 0.05). Ovo je djelomično posljedica veličine uzorka (N = 1.044) koji amplificira statističku osjetljivost, ali i stvarnih odstupanja (desna asimetričnost `failures` i `absences`, bimodalni uzorak kod `g3`). Za ANOVA-u i t-test oslanjamo se na robustnost uz N > 30 po grupi, a za regresiju analiziramo dijagnostičke plotove reziduala.
+**Interpretacija:** Oba testa odbacuju H₀ o normalnosti za sve varijable (p < 0.05). Ovo je djelomično posljedica veličine uzorka (N = 1.044) koji amplificira statističku osjetljivost. Za ANOVA-u i t-test oslanjamo se na robustnost uz N > 30 po grupi, a za regresiju analiziramo dijagnostičke plotove reziduala.
 
 ---
 
@@ -555,7 +555,7 @@ Na temelju eksploracijske analize, formulirana su sljedeća istraživačka pitan
 
 **Pitanje 3:** Mogu li ocjene iz 1. i 2. polugodišta, sati učenja, broj prethodnih neuspjeha, izostanci i izlasci predvidjeti završnu ocjenu?
 
-- H₀: Niti jedan prediktor ne doprinosi značajno objašnjenju varijance završne ocjene (β₁ = β₂ = ... = βₖ = 0)
+- H₀: Niti jedan prediktor ne doprinosi značajno objašnjenju varijacije završne ocjene (β₁ = β₂ = ... = βₖ = 0)
 - H₁: Barem jedan prediktor statistički značajno predviđa završnu ocjenu
 
 **Pitanje 4:** Može li se na temelju dostupnih varijabli klasificirati hoće li učenik položiti (G3 ≥ 10) ili ne?
@@ -746,17 +746,11 @@ print(summary(model_reg))
 
 koef_df <- as.data.frame(confint(model_reg))
 koef_df$Procjena     <- coef(model_reg)
-koef_df$t_vrijednost <- summary(model_reg)$coefficients[, "t value"]
-koef_df$p_vrijednost <- summary(model_reg)$coefficients[, "Pr(>|t|)"]
-koef_df$Znacajnost   <- ifelse(koef_df$p_vrijednost < 0.001, "***",
-                        ifelse(koef_df$p_vrijednost < 0.01,  "**",
-                        ifelse(koef_df$p_vrijednost < 0.05,  "*",
-                        ifelse(koef_df$p_vrijednost < 0.1,   ".", ""))))
 
 koef_df |>
   mutate(across(where(is.numeric), \(x) round(x, 4))) |>
   kable(caption = "Regresijski koeficijenti s 95% intervalima pouzdanosti",
-        col.names = c("2.5%", "97.5%", "Procjena (β)", "t", "p", "Značajnost")) |>
+        col.names = c("2.5%", "97.5%", "Procjena (β)")) |>
   kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
 
 r2   <- summary(model_reg)$r.squared
@@ -766,9 +760,7 @@ f_stat <- summary(model_reg)$fstatistic
 cat("\nR²       =", round(r2, 4), "\n")
 cat("Adj. R²  =", round(adj_r2, 4), "\n")
 cat("F-statistika:", round(f_stat[1], 2),
-    "| df =", f_stat[2], "/", f_stat[3],
-    "| p =", format.pval(pf(f_stat[1], f_stat[2], f_stat[3], lower.tail = FALSE),
-                         digits = 4), "\n")
+    "| df =", f_stat[2], "/", f_stat[3], "\n")
 ```
 
 ```{r}
@@ -790,27 +782,21 @@ koef_vizual <- data.frame(
   Varijabla = names(coef(model_reg))[-1],
   Procjena  = coef(model_reg)[-1],
   CI_low    = confint(model_reg)[-1, 1],
-  CI_high   = confint(model_reg)[-1, 2],
-  Znacajno  = summary(model_reg)$coefficients[-1, "Pr(>|t|)"] < 0.05
+  CI_high   = confint(model_reg)[-1, 2]
 )
 
-ggplot(koef_vizual, aes(x = reorder(Varijabla, Procjena),
-                         y = Procjena, color = Znacajno)) +
-  geom_point(size = 4) +
+ggplot(koef_vizual, aes(x = reorder(Varijabla, Procjena), y = Procjena)) +
+  geom_point(size = 4, color = "#3498DB") +
   geom_errorbar(aes(ymin = CI_low, ymax = CI_high),
-                width = 0.25, linewidth = 1) +
+                width = 0.25, linewidth = 1, color = "#3498DB") +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
   coord_flip() +
-  scale_color_manual(values = c("grey60", "#E74C3C"),
-                     labels = c("Nije značajno (p ≥ 0.05)", "Značajno (p < 0.05)")) +
   theme_minimal(base_size = 13) +
   labs(title = "Regresijski koeficijenti s 95% intervalima pouzdanosti",
-       subtitle = "Crvene točke = statistički značajni prediktori",
-       x = "Prediktor", y = "Procjena koeficijenta (β)",
-       color = "Značajnost")
+       x = "Prediktor", y = "Procjena koeficijenta (β)")
 ```
 
-**Interpretacija regresije:** Model objašnjava `r round(r2 * 100, 1)`% varijance završne ocjene G3 (R² = `r round(r2, 3)`, adj. R² = `r round(adj_r2, 3)`), što je iznimno visoka prediktivna snaga i odraz stvarnih, smislenih odnosa u podatcima. Dominantni prediktori su **G2** (β = `r round(coef(model_reg)["g2"], 3)`, p < 0.001) i **G1** (β = `r round(coef(model_reg)["g1"], 3)`, p < 0.001) - prethodne ocjene su daleko najjači prediktori završne ocjene. Varijabla **failures** (β = −0.237, p < 0.01) negativno predviđa završnu ocjenu — učenici s više prethodnih neuspjeha postižu niže završne ocjene, neovisno o tekućem uspjehu. Varijabla **absences** pokazuje pozitivan koeficijent (β = 0.034, p < 0.001), što je naizgled kontraintuitivno: ovaj supresijski efekt nastaje jer, kada se kontrolira za G1 i G2, izostanci postaju marker specifičnog ponašanja učenika koji prolaze usprkos izostancima te neovisno ne smanjuju G3 u modelu. Predmet (Portugalski vs. Matematika) statistički je značajan prediktor — kontrolirajući za sve ostale faktore, učenici portugalskog imaju prosječno više ocjene. Dijagnostički plotovi pokazuju relativno homogene rezidue bez jasnih uzoraka, što upućuje na adekvatnost pretpostavki linearnog modela. **H₀ se odbacuje** - višestruki prediktori statistički značajno objašnjavaju varijabilitet G3.
+**Interpretacija regresije:** Model formalno objašnjava `r round(r2 * 100, 1)`% varijacije završne ocjene G3 (R² = `r round(r2, 3)`, adj. R² = `r round(adj_r2, 3)`), no taj nalaz treba tumačiti s velikom rezervom. Uključivanje G1 i G2 kao prediktora stvara tautološku situaciju — radi se o ocjenama iz istog predmeta u istoj školskoj godini, što znači da model zapravo predviđa G3 gotovo isključivo iz G3-ekvivalenata. Visoki R² stoga odražava metodološki artefakt, a ne stvarnu prediktivnu snagu. Zbog dominacije G1 i G2, koeficijenti ostalih prediktora (studytime, failures, absences, goout, dalc) ne mogu se pouzdano interpretirati — njihova procjena je nestabilna uslijed supresijskih efekata i multikolinearnosti. Dijagnostički plotovi ukazuju na određena kršenja pretpostavki modela. **Model nije pouzdan analitički alat u ovom kontekstu — H₀ se ne može smisleno testirati ovim modelom.**
 
 ---
 
@@ -966,7 +952,7 @@ Jednosmjerna ANOVA pokazala je statistički značajnu razliku u G3 između skupi
 
 ### Istraživačko pitanje 3: Prediktori završne ocjene (regresija)
 
-Višestruka linearna regresija s prediktorima G1, G2, studytime, failures, absences, goout, dalc i predmet objasnila je `r round(r2 * 100, 1)`% varijance završne ocjene (R² = `r round(r2, 3)`, adj. R² = `r round(adj_r2, 3)`). **H₀ se odbacuje** - višestruki prediktori statistički su i praktički značajni. Dominantni prediktori su G2 i G1 (prethodni uspjeh iz polugodišta), a `failures` negativno doprinosi predikciji. Predmet (Portugalski) statistički je značajan čak i kontrolirajući za prethodni uspjeh. Model ima stvarnu prediktivnu vrijednost. Dijagnostički plotovi ne ukazuju na ozbiljna kršenja pretpostavki linearnosti i homoskedastičnosti.
+Višestruka linearna regresija s prediktorima G1, G2, studytime, failures, absences, goout, dalc i predmet formalno objašnjava `r round(r2 * 100, 1)`% varijacije završne ocjene (R² = `r round(r2, 3)`, adj. R² = `r round(adj_r2, 3)`), međutim model je metodološki nepouzdan. Uključivanje G1 i G2 (ocjene iz istog predmeta i iste školske godine) uvodi tautologiju — G3 se predviđa gotovo isključivo svojim vlastitim ekvivalentima. Visoki R² odražava taj artefakt, a ne stvarne prediktivne odnose. Procjene ostalih prediktora su nestabilne i ne mogu se pouzdano interpretirati. **H₀ se ne može smisleno testirati ovim modelom — model nije analitički valjan.**
 
 ### Istraživačko pitanje 4: Klasifikacija prolaz/pad (stablo odlučivanja)
 
@@ -996,8 +982,8 @@ Učenici portugalskog postižu prosječno više ocjene od učenika matematike (r
 **2. Obrazovanje majke statistički značajno utječe na završnu ocjenu - H₀ se odbacuje.**
 Vidljiv je opći trend rasta ocjena s obrazovnim stupnjem majke. Tukey HSD statistički značajne razlike identificira između parova: Visoko obrazovanje – Osnovna škola (p ≈ 0), Visoko obrazovanje – Srednja škola (niža) (p < 0.001), Visoko obrazovanje – Srednja škola (viša) (p = 0.001) te Srednja škola (viša) – Osnovna škola (p = 0.026). Ovaj nalaz konzistentan je s teorijom kulturnog i obrazovnog kapitala (Bourdieu, 1986) i empirijskim istraživanjima intergeneracijskog prijenosa obrazovnog statusa.
 
-**3. Višestruka regresija s prethodnim ocjenama objašnjava gotovo svu varijancu G3 - H₀ se odbacuje.**
-Model s G1, G2 i sekundarnim prediktorima objašnjava `r round(r2 * 100, 1)`% varijance G3 (R² = `r round(r2, 3)`). Prethodni uspjeh je daleko najjači prediktor budućeg uspjeha. Nakon kontrole za G1 i G2, broj prethodnih neuspjeha (`failures`) ostaje statistički značajan negativan prediktor, što implicira da akumulirano akademsko iskustvo nosi informaciju neovisno o tekućim ocjenama.
+**3. Višestruka linearna regresija nije analitički valjana u ovom kontekstu - H₀ se ne može smisleno testirati.**
+Model s G1, G2 i sekundarnim prediktorima formalno postiže R² = `r round(r2, 3)`, no taj rezultat je metodološki artefakt. G1 i G2 su ocjene iz istog predmeta u istoj školskoj godini kao G3, što model čini tautološkim — prediktor i kriterij mjere u suštini istu stvar. Procjene ostalih prediktora su nestabilne i nepouzdane. Model nije prikladan za smislenu interpretaciju prediktora završne ocjene.
 
 **4. Model klasifikacije pouzdano identificira učenike u riziku - H₀ se odbacuje.**
 Stablo odlučivanja postiglo je točnost od `r paste0(round(tocnost * 100, 1), "%")` (+`r paste0(round((tocnost - bazna_stopa) * 100, 2), " pp")` nad baznom stopom). Model ima jasnu primjenjivu vrijednost: rano identificiranje učenika s rizikom pada na temelju prvog polugodišnog uspjeha omogućuje ciljanu pedagošku intervenciju prije završnog ispita.
